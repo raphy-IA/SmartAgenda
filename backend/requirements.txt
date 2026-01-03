@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+supabase
+python-dotenv
+# AI & Utils
+langchain
+openai
+apscheduler
+google-generativeai

@@ -1,0 +1,429 @@
+import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../voice/presentation/notifiers/voice_controller.dart';
+import '../providers/event_providers.dart';
+import '../widgets/zen_event_card.dart';
+import 'details/event_details_screen.dart';
+import 'form/create_event_screen.dart';
+import '../../../../core/services/notification_service.dart';
+
+import '../../../../core/theme/event_theme_helper.dart';
+import '../../data/repositories/category_repository.dart';
+
+class DashboardScreen extends ConsumerStatefulWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  
+  @override
+  void initState() {
+    super.initState();
+    // Fetch Dynamic Categories on startup
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final repo = CategoryRepository();
+      final cats = await repo.getCategories();
+      EventThemeHelper.updateCache(cats);
+      if (mounted) setState(() {}); // Refresh UI
+    } catch (e) {
+      print("Failed to load categories: $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final eventsAsync = ref.watch(eventsProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              // --- DIAGNOSTIC ---
+              _buildDiagnosticButtons(context),
+              const SizedBox(height: 20),
+              // Header Zen
+              _buildHeader(context),
+              
+              const SizedBox(height: 30),
+              
+              // Timeline Label
+              Text(
+                'Timeline',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1.0,
+                ),
+              ).animate().fadeIn(delay: 200.ms),
+              
+              const SizedBox(height: 16),
+              
+              // Liste des Events
+              Expanded(
+                child: eventsAsync.when(
+                  data: (events) {
+                    if (events.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.spa_outlined, size: 64, color: AppColors.secondary),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Aucun événement.\nProfitez du calme.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                            ),
+                          ],
+                        ).animate().fadeIn().scale(),
+                      );
+                    }
+
+                    // 1. Trier par date
+                    events.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+                    // 2. Grouper par mois
+                    // Map<"Janvier 2026", List<Event>>
+                    final Map<String, List<dynamic>> groupedEvents = {};
+                    
+                    for (var event in events) {
+                      final String monthKey = DateFormat('MMMM yyyy', 'fr_FR').format(event.startTime);
+                      // Capitalize first letter
+                      final String formattedKey = monthKey[0].toUpperCase() + monthKey.substring(1);
+                      
+                      if (!groupedEvents.containsKey(formattedKey)) {
+                        groupedEvents[formattedKey] = [];
+                      }
+                      groupedEvents[formattedKey]!.add(event);
+                    }
+
+                    // 3. Afficher la liste groupée
+                    return ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: groupedEvents.length,
+                      itemBuilder: (context, index) {
+                        final String month = groupedEvents.keys.elementAt(index);
+                        final List<dynamic> monthEvents = groupedEvents[month]!;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // En-tête mois
+                            Container(
+                              margin: const EdgeInsets.only(top: 24, bottom: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                              child: Text(
+                                month,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            // Liste des events pour ce mois
+                            ...monthEvents.map((event) => ZenEventCard(
+                              event: event,
+                              onTap: () => Navigator.push(
+                                context, 
+                                MaterialPageRoute(builder: (_) => EventDetailsScreen(event: event))
+                              ),
+                            )).toList(),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, stack) => Center(child: Text('Erreur: $err', style: const TextStyle(color: AppColors.error))),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: VoiceFloatingActionButton(),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final now = DateTime.now();
+    final greeting = now.hour < 12 ? 'Bonjour' : (now.hour < 18 ? 'Bon après-midi' : 'Bonsoir');
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$greeting, Alex',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              DateFormat('d MMMM yyyy', 'fr_FR').format(now), // Nécessite init locale
+              style: TextStyle(
+                color: AppColors.textSecondary.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.add, color: AppColors.textPrimary),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateEventScreen())
+            ),
+          ),
+        ),
+      ],
+    ).animate().fadeIn().slideY(begin: -0.5, end: 0);
+  }
+
+
+  // --- WIDGET DIAGNOSTIC TEMPORAIRE ---
+  Widget _buildDiagnosticButtons(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.1),
+        border: Border.all(color: Colors.amber),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("🛠️ Zone Diagnostic (Dev)", style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    // PING
+                    final dio = Dio(); 
+                    // config de base pour le web
+                    dio.options.baseUrl = "http://127.0.0.1:8000";
+                    final response = await dio.get('/');
+                    _showStatus(context, "PING OK: ${response.statusCode}");
+                  } catch (e) {
+                    _showStatus(context, "PING ERREUR: $e");
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                child: const Text("PING"),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    // TEST PARSE
+                    final dio = Dio();
+                    dio.options.baseUrl = "http://127.0.0.1:8001/api/v1";
+                    
+                    final response = await dio.post(
+                      '/voice/parse',
+                      data: {"text": "Test Diagnostic Manuel"},
+                    );
+                    _showStatus(context, "PARSE OK: \n${response.data}");
+                  } catch (e) {
+                    _showStatus(context, "PARSE ERREUR: \n$e");
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: const Text("TEST PARSE"),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                   // TEST NOTIFICATION INSTANTANÉE
+                   await NotificationService().showInstantNotification("Test", "Ceci est une notification de test.");
+                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification Test envoyée !')));
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                child: const Text("TEST NOTIF"),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStatus(BuildContext context, String message) {
+    showDialog(context: context, builder: (c) => AlertDialog(content: Text(message)));
+  }
+}
+
+class VoiceFloatingActionButton extends ConsumerWidget {
+
+  const VoiceFloatingActionButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final voiceState = ref.watch(voiceControllerProvider);
+    final voiceController = ref.read(voiceControllerProvider.notifier);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (voiceState.error != null)
+           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.error),
+            ),
+            child: Text(
+              voiceState.error!,
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ).animate().fadeIn(),
+
+        if (voiceState.isProcessing)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.primary),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text("Analyse en cours...", style: TextStyle(color: AppColors.textPrimary)),
+              ],
+            ),
+          ).animate().fadeIn().slideY(begin: 0.5, end: 0),
+
+        if (voiceState.text.isNotEmpty && !voiceState.isProcessing)
+           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: AppColors.surface.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '"${voiceState.text}"',
+              style: const TextStyle(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+            ),
+          ).animate().fadeIn(),
+
+        // ZONE BOUTONS (Row si recording)
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // BOUTON ANNULER (Visible uniquement si recording)
+            if (voiceState.isListening)
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: GestureDetector(
+                  onTap: () {
+                    voiceController.cancelRecording();
+                  },
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.error),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.error,
+                      size: 28,
+                    ),
+                  ),
+                ).animate().scale(duration: 200.ms),
+              ),
+
+            // BOUTON PRINCIPAL (MICRO / ENVOYER)
+            GestureDetector(
+              onTap: () {
+                if (voiceState.isListening) {
+                  voiceController.stopAndSend(); // VALIDATION
+                } else {
+                  voiceController.startListening();
+                }
+              },
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: voiceState.isListening 
+                      ? [AppColors.success, const Color(0xFF69F0AE)] // Vert = Valider
+                      : [AppColors.primary, const Color(0xFF82B1FF)], // Bleu = Micro
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (voiceState.isListening ? AppColors.success : AppColors.primary).withOpacity(0.4),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  voiceState.isListening ? Icons.send_rounded : Icons.mic_rounded, // Icon Change
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+            ).animate(target: voiceState.isListening ? 1 : 0)
+            .scale(begin: const Offset(1,1), end: const Offset(1.1, 1.1), duration: 500.ms, curve: Curves.easeInOut)
+            .then().scale(begin: const Offset(1.1, 1.1), end: const Offset(1, 1), duration: 500.ms),
+          ],
+        ),
+      ],
+    );
+  }
+}
