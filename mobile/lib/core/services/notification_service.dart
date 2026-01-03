@@ -50,6 +50,7 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
       await android.requestNotificationsPermission();
+      await android.requestExactAlarmsPermission();
     }
     
     // iOS permissions

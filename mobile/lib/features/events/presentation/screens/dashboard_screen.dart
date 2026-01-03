@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -55,7 +55,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               const SizedBox(height: 20),
               // --- DIAGNOSTIC ---
-              _buildDiagnosticButtons(context),
+              // --- DIAGNOSTIC REMOVED ---
               const SizedBox(height: 20),
               // Header Zen
               _buildHeader(context),
@@ -175,6 +175,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
+              'Smart Agenda',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
               '$greeting, Alex',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 color: AppColors.textPrimary,
@@ -183,7 +192,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              DateFormat('d MMMM yyyy', 'fr_FR').format(now), // Nécessite init locale
+              DateFormat('d MMMM yyyy', 'fr_FR').format(now),
               style: TextStyle(
                 color: AppColors.textSecondary.withOpacity(0.8),
                 fontSize: 14,
@@ -212,78 +221,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
 
-  // --- WIDGET DIAGNOSTIC TEMPORAIRE ---
-  Widget _buildDiagnosticButtons(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.1),
-        border: Border.all(color: Colors.amber),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("🛠️ Zone Diagnostic (Dev)", style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    // PING
-                    final dio = Dio(); 
-                    // config de base pour le web
-                    dio.options.baseUrl = "http://127.0.0.1:8000";
-                    final response = await dio.get('/');
-                    _showStatus(context, "PING OK: ${response.statusCode}");
-                  } catch (e) {
-                    _showStatus(context, "PING ERREUR: $e");
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                child: const Text("PING"),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    // TEST PARSE
-                    final dio = Dio();
-                    dio.options.baseUrl = "http://127.0.0.1:8001/api/v1";
-                    
-                    final response = await dio.post(
-                      '/voice/parse',
-                      data: {"text": "Test Diagnostic Manuel"},
-                    );
-                    _showStatus(context, "PARSE OK: \n${response.data}");
-                  } catch (e) {
-                    _showStatus(context, "PARSE ERREUR: \n$e");
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text("TEST PARSE"),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                   // TEST NOTIFICATION INSTANTANÉE
-                   await NotificationService().showInstantNotification("Test", "Ceci est une notification de test.");
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification Test envoyée !')));
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                child: const Text("TEST NOTIF"),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showStatus(BuildContext context, String message) {
-    showDialog(context: context, builder: (c) => AlertDialog(content: Text(message)));
-  }
 }
 
 class VoiceFloatingActionButton extends ConsumerWidget {

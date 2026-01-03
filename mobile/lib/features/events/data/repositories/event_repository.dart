@@ -5,7 +5,7 @@ class EventRepository {
   // En Web, localhost est accessible directement.
   // En Android Emulator, c'est 10.0.2.2.
   // Pour ce test Chrome, on utilise localhost.
-  final String baseUrl = "http://127.0.0.1:8001/api/v1"; 
+  final String baseUrl = "http://148.230.80.83:8001/api/v1"; 
   final Dio _dio = Dio();
 
   EventRepository(dynamic unusedClient); // Garder la signature pour compatibilité Providers temporaire

@@ -3,7 +3,7 @@ import '../models/category.dart';
 
 class CategoryRepository {
   final Dio _dio;
-  final String _baseUrl = 'http://127.0.0.1:8001/api/v1'; // Localhost for Chrome
+  final String _baseUrl = 'http://148.230.80.83:8001/api/v1'; // VPS Prod
 
   CategoryRepository() : _dio = Dio();
 
