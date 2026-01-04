@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../data/models/event.dart';
 import '../../providers/event_providers.dart';
+import 'package:dio/dio.dart';
 
 import '../../../../../core/theme/event_theme_helper.dart';
 import '../../../../../core/services/notification_service.dart';
@@ -313,7 +314,26 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
         ref.refresh(eventsProvider); // Reload list
         if (mounted) Navigator.pop(context);
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+        String msg = 'Erreur survenue';
+        if (e is DioException) {
+          if (e.response?.statusCode == 409) {
+            msg = "⚠️ Impossible : Ce créneau est déjà occupé !";
+          } else {
+            msg = "Erreur réseau : ${e.message}";
+          }
+        } else {
+          msg = "Erreur : $e";
+        }
+        
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(
+               content: Text(msg),
+               backgroundColor: AppColors.error,
+               behavior: SnackBarBehavior.floating,
+             )
+           );
+        }
       }
     }
   }
