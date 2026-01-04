@@ -64,6 +64,9 @@ class VoiceController extends StateNotifier<VoiceState> {
       onResult: (result) {
         state = state.copyWith(text: result.recognizedWords);
       },
+      localeId: "fr_FR",
+      pauseFor: const Duration(seconds: 5),
+      listenFor: const Duration(seconds: 30),
       listenOptions: SpeechListenOptions(cancelOnError: true, partialResults: true),
     );
   }
