@@ -285,13 +285,11 @@ class VoiceFloatingActionButton extends ConsumerWidget {
             ),
           ).animate().fadeIn(),
 
-        // ZONE BOUTONS
         if (voiceState.text.isNotEmpty && !voiceState.isListening && !voiceState.isProcessing)
           // CAS 1 : Texte capturé -> Valider ou Annuler
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // BOUTON ANNULER
               GestureDetector(
                 onTap: () => voiceController.cancelRecording(),
                 child: Container(
@@ -300,10 +298,7 @@ class VoiceFloatingActionButton extends ConsumerWidget {
                   child: const Icon(Icons.close, color: AppColors.error),
                 ),
               ).animate().scale(),
-              
               const SizedBox(width: 20),
-
-              // BOUTON VALIDER
               GestureDetector(
                 onTap: () => voiceController.submitCapturedText(),
                 child: Container(
@@ -319,43 +314,74 @@ class VoiceFloatingActionButton extends ConsumerWidget {
             ],
           )
         else
-          // CAS 2 : Écoute ou Repos
-          GestureDetector(
-            onTap: () {
-              if (voiceState.isListening) {
-                voiceController.stopAndSend(); 
-              } else {
-                voiceController.startListening();
-              }
-            },
-            child: Container(
-              width: 72, height: 72,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: voiceState.isListening 
-                    ? [AppColors.error, const Color(0xFFFF8A80)] // Rouge pour STOP
-                    : [AppColors.primary, const Color(0xFF82B1FF)], // Bleu pour MICRO
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: (voiceState.isListening ? AppColors.error : AppColors.primary).withOpacity(0.4),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
+          // CAS 2 : Pas de texte à valider -> Mode Micro ou Stop
+          Row(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+                // BOUTON LANGUE (Visible si pas en écoute)
+                if (!voiceState.isListening)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: GestureDetector(
+                      onTap: () => voiceController.toggleLanguage(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: voiceState.localeId == "fr-FR" ? AppColors.primary : AppColors.textSecondary),
+                        ),
+                        child: Text(
+                          voiceState.localeId == "fr-FR" ? "FR" : "AUTO",
+                          style: TextStyle(
+                            color: voiceState.localeId == "fr-FR" ? AppColors.primary : AppColors.textSecondary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              child: Icon(
-                voiceState.isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-          ).animate(target: voiceState.isListening ? 1 : 0)
-          .scale(begin: const Offset(1,1), end: const Offset(1.1, 1.1), duration: 500.ms, curve: Curves.easeInOut)
-          .then().scale(begin: const Offset(1.1, 1.1), end: const Offset(1, 1), duration: 500.ms),
+
+                // BOUTON MICRO / STOP
+                GestureDetector(
+                onTap: () {
+                  if (voiceState.isListening) {
+                    voiceController.stopAndSend(); 
+                  } else {
+                    voiceController.startListening();
+                  }
+                },
+                child: Container(
+                  width: 72, height: 72,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: voiceState.isListening 
+                        ? [AppColors.error, const Color(0xFFFF8A80)] // Rouge pour STOP
+                        : [AppColors.primary, const Color(0xFF82B1FF)], // Bleu pour MICRO
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (voiceState.isListening ? AppColors.error : AppColors.primary).withOpacity(0.4),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    voiceState.isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ).animate(target: voiceState.isListening ? 1 : 0)
+              .scale(begin: const Offset(1,1), end: const Offset(1.1, 1.1), duration: 500.ms, curve: Curves.easeInOut)
+              .then().scale(begin: const Offset(1.1, 1.1), end: const Offset(1, 1), duration: 500.ms),
+             ],
+          ),
       ],
     );
   }

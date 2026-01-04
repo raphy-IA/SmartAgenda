@@ -10,12 +10,14 @@ class VoiceState {
   final bool isProcessing;
   final String text; // Texte reconnu
   final String? error;
+  final String? localeId; // "fr-FR" or null (System)
 
   VoiceState({
     this.isListening = false,
     this.isProcessing = false,
     this.text = '',
     this.error,
+    this.localeId,
   });
 
   VoiceState copyWith({
@@ -23,12 +25,14 @@ class VoiceState {
     bool? isProcessing,
     String? text,
     String? error,
+    String? localeId,
   }) {
     return VoiceState(
       isListening: isListening ?? this.isListening,
       isProcessing: isProcessing ?? this.isProcessing,
       text: text ?? this.text,
       error: error ?? this.error,
+      localeId: localeId ?? this.localeId,
     );
   }
 }
@@ -58,6 +62,15 @@ class VoiceController extends StateNotifier<VoiceState> {
     }
   }
 
+  // TOGGLE LANGUAGE
+  void toggleLanguage() {
+    if (state.localeId == "fr-FR") {
+       state = state.copyWith(localeId: null); // Back to System (English?)
+    } else {
+       state = state.copyWith(localeId: "fr-FR"); // Force French
+    }
+  }
+
   Future<void> startListening() async {
     state = state.copyWith(isListening: true, error: null, text: '');
     await _speechToText.listen(
@@ -65,6 +78,7 @@ class VoiceController extends StateNotifier<VoiceState> {
         state = state.copyWith(text: result.recognizedWords);
       },
 
+      localeId: state.localeId, // Use State Locale
       pauseFor: const Duration(seconds: 5),
       listenFor: const Duration(seconds: 30),
       listenOptions: SpeechListenOptions(cancelOnError: true, partialResults: true),
@@ -101,6 +115,8 @@ class VoiceController extends StateNotifier<VoiceState> {
     
     state = state.copyWith(isProcessing: true);
     try {
+      // Pass locale to Backend for better parsing context (optional but good)
+      // For now, backend detects language, but we send text.
       final event = await _repository.parseCommand(text);
       
       // CHECK REFUS IA (HORS SUJET)
