@@ -16,6 +16,7 @@ dependencies:
   # Networking
   dio: ^5.4.0
   supabase_flutter: ^2.3.0
+  google_sign_in: ^6.1.0
   
   # UI/UX
   google_fonts: ^6.1.0

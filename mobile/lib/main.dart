@@ -48,7 +48,29 @@ class SmartAgendaApp extends StatelessWidget {
         ),
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
       ),
-      home: const DashboardScreen(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends ConsumerWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+
+    return authState.when(
+      data: (state) {
+        final session = state.session;
+        if (session != null) {
+          return const DashboardScreen();
+        } else {
+          return const LoginScreen();
+        }
+      },
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(body: Center(child: Text("Erreur Auth: $err"))),
     );
   }
 }
