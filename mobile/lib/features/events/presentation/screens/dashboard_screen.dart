@@ -285,82 +285,77 @@ class VoiceFloatingActionButton extends ConsumerWidget {
             ),
           ).animate().fadeIn(),
 
-        // ZONE BOUTONS (Row si recording)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // BOUTON ANNULER (Visible uniquement si recording)
-            if (voiceState.isListening)
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: GestureDetector(
-                  onTap: () {
-                    voiceController.cancelRecording();
-                  },
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.error),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: AppColors.error,
-                      size: 28,
-                    ),
-                  ),
-                ).animate().scale(duration: 200.ms),
-              ),
+        // ZONE BOUTONS
+        if (voiceState.text.isNotEmpty && !voiceState.isListening && !voiceState.isProcessing)
+          // CAS 1 : Texte capturé -> Valider ou Annuler
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // BOUTON ANNULER
+              GestureDetector(
+                onTap: () => voiceController.cancelRecording(),
+                child: Container(
+                  width: 50, height: 50,
+                  decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: AppColors.error)),
+                  child: const Icon(Icons.close, color: AppColors.error),
+                ),
+              ).animate().scale(),
+              
+              const SizedBox(width: 20),
 
-            // BOUTON PRINCIPAL (MICRO / ENVOYER)
-            GestureDetector(
-              onTap: () {
-                if (voiceState.isListening) {
-                  voiceController.stopAndSend(); // VALIDATION
-                } else {
-                  voiceController.startListening();
-                }
-              },
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: voiceState.isListening 
-                      ? [AppColors.success, const Color(0xFF69F0AE)] // Vert = Valider
-                      : [AppColors.primary, const Color(0xFF82B1FF)], // Bleu = Micro
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              // BOUTON VALIDER
+              GestureDetector(
+                onTap: () => voiceController.submitCapturedText(),
+                child: Container(
+                  width: 72, height: 72,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [AppColors.success, Color(0xFF69F0AE)]),
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: AppColors.success.withOpacity(0.4), blurRadius: 10, offset: const Offset(0,4))],
                   ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: (voiceState.isListening ? AppColors.success : AppColors.primary).withOpacity(0.4),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 32),
                 ),
-                child: Icon(
-                  voiceState.isListening ? Icons.send_rounded : Icons.mic_rounded, // Icon Change
-                  color: Colors.white,
-                  size: 32,
+              ).animate().scale(),
+            ],
+          )
+        else
+          // CAS 2 : Écoute ou Repos
+          GestureDetector(
+            onTap: () {
+              if (voiceState.isListening) {
+                voiceController.stopAndSend(); 
+              } else {
+                voiceController.startListening();
+              }
+            },
+            child: Container(
+              width: 72, height: 72,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: voiceState.isListening 
+                    ? [AppColors.error, const Color(0xFFFF8A80)] // Rouge pour STOP
+                    : [AppColors.primary, const Color(0xFF82B1FF)], // Bleu pour MICRO
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: (voiceState.isListening ? AppColors.error : AppColors.primary).withOpacity(0.4),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ).animate(target: voiceState.isListening ? 1 : 0)
-            .scale(begin: const Offset(1,1), end: const Offset(1.1, 1.1), duration: 500.ms, curve: Curves.easeInOut)
-            .then().scale(begin: const Offset(1.1, 1.1), end: const Offset(1, 1), duration: 500.ms),
-          ],
-        ),
+              child: Icon(
+                voiceState.isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+          ).animate(target: voiceState.isListening ? 1 : 0)
+          .scale(begin: const Offset(1,1), end: const Offset(1.1, 1.1), duration: 500.ms, curve: Curves.easeInOut)
+          .then().scale(begin: const Offset(1.1, 1.1), end: const Offset(1, 1), duration: 500.ms),
       ],
     );
   }

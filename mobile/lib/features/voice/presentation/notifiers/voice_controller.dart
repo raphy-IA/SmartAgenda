@@ -64,18 +64,22 @@ class VoiceController extends StateNotifier<VoiceState> {
       onResult: (result) {
         state = state.copyWith(text: result.recognizedWords);
       },
-      localeId: "fr_FR",
+      localeId: "fr-FR",
       pauseFor: const Duration(seconds: 5),
       listenFor: const Duration(seconds: 30),
       listenOptions: SpeechListenOptions(cancelOnError: true, partialResults: true),
     );
   }
 
-  // STOP & SEND
+  // STOP & SEND (Called while listening)
   Future<void> stopAndSend() async {
     await _speechToText.stop();
     state = state.copyWith(isListening: false);
-    
+    await submitCapturedText();
+  }
+
+  // SUBMIT (Called after listening stops automatically)
+  Future<void> submitCapturedText() async {
     if (state.text.isNotEmpty) {
       final capturedText = state.text;
       await _processCommand(capturedText);
