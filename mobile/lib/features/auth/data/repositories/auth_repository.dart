@@ -8,7 +8,7 @@ class AuthRepository {
 
   AuthRepository(this._supabase) 
       : _googleSignIn = GoogleSignIn(
-          // serverClientId: "[WEB_CLIENT_ID_FROM_GOOGLE_CLOUD]", // Optional for pure ID Token flow usually
+          serverClientId: "31548980170-3mpqeqaqbspfftdppl9b30ijn29kv38q.apps.googleusercontent.com",
         );
 
   Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
