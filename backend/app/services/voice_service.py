@@ -7,18 +7,22 @@ from app.schemas.event import EventCreate
 class VoiceParsingService:
     
     @staticmethod
-    def parse_natural_language(text: str, user_timezone: str = "America/New_York") -> EventCreate:
+    def parse_natural_language(text: str, user_timezone: str = "UTC", reference_time: str = None) -> EventCreate:
         """
         Orchestrateur Principal : Stratégie de Cascade (Failover).
         Ordre : Groq (Rapide) -> Gemini (Google) -> OpenAI (Si clé) -> Mock (Secours)
         """
         errors = []
         
+        # If no reference time provided, fallback to server time (UTC)
+        if not reference_time:
+             reference_time = datetime.now().isoformat()
+
         # 1. TENTATIVE GROQ (Priorité Vitesse/Gratuit)
         if settings.GROQ_API_KEY:
             try:
                 print("🤖 AI ENGINE: Trying Provider 'GROQ'...")
-                return VoiceParsingService._parse_with_groq(text, user_timezone)
+                return VoiceParsingService._parse_with_groq(text, user_timezone, reference_time)
             except Exception as e:
                 print(f"⚠️ Failover: Groq failed ({e}). Switching to next...")
                 errors.append(f"Groq: {e}")
@@ -27,7 +31,11 @@ class VoiceParsingService:
         if settings.GEMINI_API_KEY:
             try:
                 print("🤖 AI ENGINE: Trying Provider 'GEMINI'...")
-                return VoiceParsingService._parse_with_gemini(text, user_timezone)
+        # 2. TENTATIVE GEMINI (Backup Puissant)
+        if settings.GEMINI_API_KEY:
+            try:
+                print("🤖 AI ENGINE: Trying Provider 'GEMINI'...")
+                return VoiceParsingService._parse_with_gemini(text, user_timezone, reference_time)
             except Exception as e:
                 print(f"⚠️ Failover: Gemini failed ({e}). Switching to next...")
                 errors.append(f"Gemini: {e}")
@@ -36,7 +44,11 @@ class VoiceParsingService:
         if settings.OPENAI_API_KEY:
             try:
                 print("🤖 AI ENGINE: Trying Provider 'OPENAI'...")
-                return VoiceParsingService._parse_with_openai(text, user_timezone)
+        # 3. TENTATIVE OPENAI (Dernier recours payant)
+        if settings.OPENAI_API_KEY:
+            try:
+                print("🤖 AI ENGINE: Trying Provider 'OPENAI'...")
+                return VoiceParsingService._parse_with_openai(text, user_timezone, reference_time)
             except Exception as e:
                 errors.append(f"OpenAI: {e}")
                 
@@ -48,14 +60,15 @@ class VoiceParsingService:
 
     # --- PROVIDER: GROQ (LLAMA 3) ---
     @staticmethod
-    def _parse_with_groq(text: str, user_timezone: str) -> EventCreate:
+    def _parse_with_groq(text: str, user_timezone: str, current_time: str) -> EventCreate:
         from groq import Groq
         
         if not settings.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY manquante.")
 
         client = Groq(api_key=settings.GROQ_API_KEY)
-        current_time = datetime.now().isoformat()
+        client = Groq(api_key=settings.GROQ_API_KEY)
+        # current_time is passed as argument
         
         system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
 
@@ -106,14 +119,15 @@ class VoiceParsingService:
 
     # --- PROVIDER: OPENAI ---
     @staticmethod
-    def _parse_with_openai(text: str, user_timezone: str) -> EventCreate:
+    def _parse_with_openai(text: str, user_timezone: str, current_time: str) -> EventCreate:
         from openai import OpenAI
         
         if not settings.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY manquante.")
 
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        current_time = datetime.now().isoformat()
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        # current_time is passed as argument
         
         system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
 
@@ -142,7 +156,7 @@ class VoiceParsingService:
 
     # --- PROVIDER: GOOGLE GEMINI ---
     @staticmethod
-    def _parse_with_gemini(text: str, user_timezone: str) -> EventCreate:
+    def _parse_with_gemini(text: str, user_timezone: str, current_time: str) -> EventCreate:
         import google.generativeai as genai
         
         if not settings.GEMINI_API_KEY:
@@ -166,9 +180,10 @@ class VoiceParsingService:
             "top_k": 64,
             "max_output_tokens": 8192,
             "response_mime_type": "application/json",
+
+
         }
 
-        current_time = datetime.now().isoformat()
         system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
         full_prompt = f"{system_prompt}\n\nUSER REQUEST: {text}"
 

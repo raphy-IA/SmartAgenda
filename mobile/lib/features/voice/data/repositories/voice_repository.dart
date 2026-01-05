@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../events/data/models/event.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VoiceRepository {
   final Dio _dio;
@@ -7,7 +8,17 @@ class VoiceRepository {
   // VPS Production
   final String baseUrl = "http://148.230.80.83:8001/api/v1"; 
 
-  VoiceRepository(this._dio);
+  VoiceRepository(this._dio) {
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final session = Supabase.instance.client.auth.currentSession;
+        if (session != null) {
+          options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+        }
+        return handler.next(options);
+      },
+    ));
+  }
 
   Future<Event> parseCommand(String text) async {
     try {
@@ -22,7 +33,8 @@ class VoiceRepository {
       final response = await _dio.post('$baseUrl/voice/parse',
         data: {
             'text': text,
-            'user_timezone': formattedOffset // Envoi dynamique
+            'user_timezone': formattedOffset, 
+            'local_time': now.toIso8601String(), // Envoi de l'heure locale exacte
         },
       );
       final data = response.data;
