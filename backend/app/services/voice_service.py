@@ -67,7 +67,6 @@ class VoiceParsingService:
             raise ValueError("GROQ_API_KEY manquante.")
 
         client = Groq(api_key=settings.GROQ_API_KEY)
-        client = Groq(api_key=settings.GROQ_API_KEY)
         # current_time is passed as argument
         
         system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
@@ -126,7 +125,6 @@ class VoiceParsingService:
             raise ValueError("OPENAI_API_KEY manquante.")
 
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
         # current_time is passed as argument
         
         system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
@@ -181,8 +179,6 @@ class VoiceParsingService:
             "max_output_tokens": 8192,
             "response_mime_type": "application/json",
 
-
-        }
 
         system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
         full_prompt = f"{system_prompt}\n\nUSER REQUEST: {text}"
