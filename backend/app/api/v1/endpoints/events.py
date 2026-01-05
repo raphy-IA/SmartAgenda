@@ -1,4 +1,3 @@
-```python
 from typing import List, Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from app.schemas.event import Event, EventCreate, EventUpdate
