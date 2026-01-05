@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../models/event.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EventRepository {
   // En Web, localhost est accessible directement.
@@ -8,7 +9,17 @@ class EventRepository {
   final String baseUrl = "http://148.230.80.83:8001/api/v1"; 
   final Dio _dio = Dio();
 
-  EventRepository(dynamic unusedClient); // Garder la signature pour compatibilité Providers temporaire
+  EventRepository(dynamic unusedClient) {
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final session = Supabase.instance.client.auth.currentSession;
+        if (session != null) {
+          options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+        }
+        return handler.next(options);
+      },
+    ));
+  }
 
   Future<List<Event>> getEvents() async {
     try {

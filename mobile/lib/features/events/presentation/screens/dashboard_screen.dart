@@ -168,6 +168,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final now = DateTime.now();
     final greeting = now.hour < 12 ? 'Bonjour' : (now.hour < 18 ? 'Bon après-midi' : 'Bonsoir');
 
+    // Get User Name from Supabase Auth
+    final user = Supabase.instance.client.auth.currentUser;
+    final userName = user?.userMetadata?['full_name']?.toString().split(' ').first ?? 'Alex';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -184,7 +188,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '$greeting, Alex',
+              '$greeting, $userName',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
