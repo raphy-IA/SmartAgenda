@@ -6,6 +6,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/constants/app_colors.dart';
 import 'features/events/presentation/screens/dashboard_screen.dart';
 import 'core/services/notification_service.dart';
+import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/data/repositories/auth_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
