@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
+import '../../../../core/config/api_config.dart';
 import '../models/category.dart';
 
 class CategoryRepository {
   final Dio _dio;
-  final String _baseUrl = 'http://148.230.80.83:8001/api/v1'; // VPS Prod
+  final String _baseUrl = ApiConfig.baseUrl; 
 
   CategoryRepository() : _dio = Dio();
 

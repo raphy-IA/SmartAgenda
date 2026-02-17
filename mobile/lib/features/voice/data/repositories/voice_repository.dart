@@ -1,40 +1,47 @@
 import 'package:dio/dio.dart';
 import '../../../events/data/models/event.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/config/api_config.dart';
 
 class VoiceRepository {
   final Dio _dio;
-  
-  // VPS Production
-  final String baseUrl = "http://148.230.80.83:8001/api/v1"; 
+  final String baseUrl = ApiConfig.baseUrl; 
 
   VoiceRepository(this._dio) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
-        final session = Supabase.instance.client.auth.currentSession;
-        if (session != null) {
-          options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+        if (ApiConfig.isDemoMode) {
+          options.headers['Authorization'] = 'Bearer demo-token';
+        } else {
+          final session = Supabase.instance.client.auth.currentSession;
+          if (session != null) {
+            options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+          }
         }
         return handler.next(options);
       },
     ));
   }
 
-  Future<Event> parseCommand(String text) async {
+  Future<Event> parseCommand(String text, {required String language}) async {
     try {
-      // Calculer l'offset local (ex: "UTC-05:00")
+      // Calcul du décalage exact (ex: "+01:00")
       final now = DateTime.now();
       final offset = now.timeZoneOffset;
-      final hours = offset.inHours;
-      final minutes = (offset.inMinutes % 60).abs();
-      final sign = hours >= 0 ? '+' : '-';
-      final formattedOffset = "UTC$sign${hours.abs().toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}";
+      final hours = offset.inHours.abs().toString().padLeft(2, '0');
+      final minutes = (offset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+      final sign = offset.isNegative ? '-' : '+';
+      final formattedOffset = "UTC$sign$hours:$minutes";
+
+      // ISO8601 avec Offset (Crucial pour l'IA)
+      final localIso = "${now.toIso8601String().split('.')[0]}$sign$hours:$minutes";
 
       final response = await _dio.post('$baseUrl/voice/parse',
         data: {
             'text': text,
             'user_timezone': formattedOffset, 
-            'local_time': now.toIso8601String(), // Envoi de l'heure locale exacte
+            'local_time': localIso,
+            'language': language, // AUTO, FR ou EN
         },
       );
       final data = response.data;
@@ -44,9 +51,14 @@ class VoiceRepository {
         data['id'] = 'temp_${DateTime.now().millisecondsSinceEpoch}';
       }
       
-      return Event.fromJson(data);
+      final event = Event.fromJson(data);
+      return event;
     } catch (e) {
-      throw Exception('Failed to parse voice command: $e');
+      if (e is DioException && e.response?.statusCode == 409) {
+          // Si le parsing a fonctionné mais que le backend a détecté un conflit pendant le process interm (rare ici car /parse ne crée pas)
+          // Mais au cas où le repository d'event est appelé par l'user après.
+      }
+      rethrow;
     }
   }
 }

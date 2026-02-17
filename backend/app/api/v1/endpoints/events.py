@@ -1,4 +1,5 @@
 from typing import List, Any
+from datetime import timezone
 from fastapi import APIRouter, HTTPException, Query, Request
 from app.schemas.event import Event, EventCreate, EventUpdate
 from app.services.event_service import EventService
@@ -18,6 +19,11 @@ def get_current_user_id(authorization: str):
              raise HTTPException(status_code=401, detail="Invalid Header Format")
              
         token = parts[1]
+
+        # --- BYPASS DEMO MODE ---
+        if token == "demo-token":
+            return "00000000-0000-0000-0000-000000000000"
+
         # Decode without verifying signature (requires secret) - Trusting the bearer for now 
         payload = jwt.decode(token, options={"verify_signature": False})
         return payload.get("sub")
@@ -47,17 +53,17 @@ async def read_events(
 async def create_event(
     request: Request,
     event_in: EventCreate,
+    force: bool = Query(False)
 ):
     """
     Create new event with AI checks.
     """
     try:
         user_id = get_current_user_id(request.headers.get("Authorization"))
-        print(f"DEBUG: Start create_event with user {user_id}")
+        print(f"DEBUG: Start create_event with user {user_id} (force={force})")
         
         # 1. Recuperer les events existants pour check conflits
         raw_events = EventService.get_user_events(user_id)
-        print(f"DEBUG: Raw events count: {len(raw_events)}")
         
         existing_events = []
         for e in raw_events:
@@ -66,32 +72,46 @@ async def create_event(
             except Exception as ev_err:
                 print(f"WARN: Failed to validate existing event {e.get('id')}: {ev_err}")
 
-        print(f"DEBUG: Validated events: {len(existing_events)}")
-        
         # 1.5 Dédoublonnage Anti-Spam
         for existing in existing_events:
-            if existing.title == event_in.title and existing.start_time == event_in.start_time:
-                 print(f"🚨 DUPLICATE DETECTED: {event_in.title}. Returning existing one.")
+            # On compare en UTC normalisé pour être sur
+            e_start = existing.start_time.replace(tzinfo=timezone.utc) if existing.start_time.tzinfo is None else existing.start_time.astimezone(timezone.utc)
+            new_start = event_in.start_time.replace(tzinfo=timezone.utc) if event_in.start_time.tzinfo is None else event_in.start_time.astimezone(timezone.utc)
+            
+            if existing.title == event_in.title and e_start == new_start:
+                 print(f"DEBUG: Duplicate detected for '{event_in.title}' at {new_start}")
                  return {
                     "id": str(existing.id),
                     "status": "duplicate_ignored",
-                    "message": "Doublon détecté et ignoré."
+                    "code": "duplicate",
+                    "message": "Cet événement existe déjà à cet horaire."
                  }
 
-        # 2. Check Conflits
+        # 2. Check Conflits (Uniquement si force=False)
         from app.services.ai_engine import AIEngine
-        print("DEBUG: Checking conflicts...")
-        conflicts = AIEngine.detect_conflicts(event_in, existing_events)
-        print(f"DEBUG: Conflicts found: {len(conflicts)}")
         
-        if conflicts:
+        user_tz = "UTC"
+        try:
+            # On essaye d'extraire la timezone du header X-User-Timezone ou via metadata
+            user_tz = request.headers.get("X-User-Timezone", "UTC")
+        except: pass
+
+        conflicts = AIEngine.detect_conflicts(event_in, existing_events, user_timezone_str=user_tz)
+        
+        if conflicts and not force:
             conflict_ids = [str(c.id) for c in conflicts]
+            conflict_titles = [c.title for c in conflicts]
+            
+            # AI suggestions for next free slots
+            suggestions = AIEngine.find_suggestions(event_in, existing_events, user_timezone_str=user_tz)
+            
             raise HTTPException(
                 status_code=409,
                 detail={
                     "code": "conflict_detected",
-                    "message": f"Conflit détecté avec {len(conflicts)} événement(s).",
-                    "conflicting_events": conflict_ids
+                    "message": f"Conflit détecté avec : {', '.join(conflict_titles)}",
+                    "conflicting_events": conflict_ids,
+                    "suggestions": suggestions
                 }
             )
 

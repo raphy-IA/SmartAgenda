@@ -1,21 +1,32 @@
 import 'package:dio/dio.dart';
-import '../models/event.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:smart_agenda_ai/core/config/api_config.dart';
+import 'package:smart_agenda_ai/features/events/data/models/event.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EventRepository {
-  // En Web, localhost est accessible directement.
-  // En Android Emulator, c'est 10.0.2.2.
-  // Pour ce test Chrome, on utilise localhost.
-  final String baseUrl = "http://148.230.80.83:8001/api/v1"; 
+  final String baseUrl = ApiConfig.baseUrl; 
   final Dio _dio = Dio();
 
   EventRepository(dynamic unusedClient) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
-        final session = Supabase.instance.client.auth.currentSession;
-        if (session != null) {
-          options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+        if (ApiConfig.isDemoMode) {
+          options.headers['Authorization'] = 'Bearer demo-token';
+        } else {
+          final session = Supabase.instance.client.auth.currentSession;
+          if (session != null) {
+            options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+          }
         }
+        
+        // --- ADD TIMEZONE OFFSET ---
+        final offset = DateTime.now().timeZoneOffset;
+        final hours = offset.inHours.abs().toString().padLeft(2, '0');
+        final minutes = (offset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+        final sign = offset.isNegative ? '-' : '+';
+        options.headers['X-User-Timezone'] = 'UTC$sign$hours:$minutes';
+        
         return handler.next(options);
       },
     ));
@@ -43,11 +54,31 @@ class EventRepository {
     }
   }
 
-  Future<void> createEvent(Event event) async {
+  Future<Event> createEvent(Event event, {bool ignoreConflicts = false}) async {
     try {
-      await _dio.post('$baseUrl/events/', data: event.toJson());
+      final response = await _dio.post(
+        '$baseUrl/events/', 
+        data: event.toJson(),
+        queryParameters: {'force': ignoreConflicts},
+      );
+      
+      if (response.data is Map && response.data['code'] == 'duplicate') {
+        throw DuplicateException(message: response.data['message'] ?? "Déjà existant");
+      }
+      return Event.fromJson(response.data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        // Propagation des détails du conflit (incluant les suggestions)
+        throw ConflictException(
+          message: e.response?.data['detail']['message'] ?? "Conflit détecté",
+          suggestions: (e.response?.data['detail']['suggestions'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+        );
+      }
+      print("Erreur POST Event (Dio): $e");
+      throw e;
     } catch (e) {
-      print("Erreur POST Event: $e");
+      if (e is DuplicateException) rethrow;
+      print("Erreur POST Event (Generic): $e");
       throw e;
     }
   }
@@ -69,4 +100,20 @@ class EventRepository {
       throw e;
     }
   }
+}
+
+class DuplicateException implements Exception {
+  final String message;
+  DuplicateException({required this.message});
+  @override
+  String toString() => message;
+}
+
+class ConflictException implements Exception {
+  final String message;
+  final List<dynamic> suggestions;
+  ConflictException({required this.message, required this.suggestions});
+  
+  @override
+  String toString() => message;
 }

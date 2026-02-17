@@ -17,19 +17,26 @@ async def parse_command(request: Request):
         print(f"✅ DEBUG BACKEND: Body reçu : {body}")
         text = body.get('text', text)
         user_tz = body.get('user_timezone', "UTC") 
-        local_time = body.get('local_time') # ISO format e.g. "2026-01-05T00:00:00+01:00"
+        local_time = body.get('local_time')
+        language = body.get('language', 'auto')
         
-        print(f"✅ DEBUG BACKEND: Timezone: {user_tz}, Local Time: {local_time}")
+        print(f"✅ DEBUG BACKEND: Timezone: {user_tz}, Local Time: {local_time}, Language: {language}")
     except Exception as e:
         print(f"⚠️ DEBUG BACKEND: Erreur lecture JSON: {e}")
         user_tz = "UTC"
         local_time = None
+        language = 'auto'
     
     # Tentative d'utilisation du Service Intelligent
     try:
         from app.services.voice_service import VoiceParsingService
-        print("🤖 AI ENGINE: Tentative de parsing intelligent...")
-        event_data = VoiceParsingService.parse_natural_language(text, user_timezone=user_tz, reference_time=local_time)
+        print(f"🤖 AI ENGINE: Tentative de parsing intelligent (Lang: {language})...")
+        event_data = VoiceParsingService.parse_natural_language(
+            text, 
+            user_timezone=user_tz, 
+            reference_time=local_time,
+            language_hint=language
+        )
         print(f"🤖 AI ENGINE: Succès ! {event_data}")
         
         # Conversion Pydantic -> Dict pour la réponse JSON

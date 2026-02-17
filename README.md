@@ -29,5 +29,16 @@ La documentation détaillée de la conception se trouve dans le dossier `/docs` 
 - [🎨 UI/UX Concepts](docs/ui_ux_concepts.md)
 - [📅 Roadmap](docs/roadmap.md)
 
-## 📦 Installation
-*Instructions à venir pour le setup de l'environnement de dev.*
+## 📦 Installation et Démarrage
+
+### 🚀 Démarrage Rapide (5 minutes)
+Consultez le [**Quick Start Guide**](docs/guides/00_quick_start.md) pour tester l'application rapidement.
+
+### 📖 Guides Complets
+Pour une installation complète et toutes les options de développement/déploiement :
+
+- **[⚡ Quick Start](docs/guides/00_quick_start.md)** - Démarrage rapide selon votre objectif
+- **[🛠️ Configuration Développement](docs/guides/01_development_setup.md)** - Installation complète et toutes les options de dev
+- **[🚀 Déploiement Production](docs/guides/02_production_deployment.md)** - VPS, Docker, HTTPS, App Stores, CI/CD
+- **[📖 Index des Guides](docs/guides/README.md)** - Tous les guides disponibles
+

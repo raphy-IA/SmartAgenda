@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
+import '../../../../main.dart';
+import '../../../../core/config/api_config.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -102,6 +104,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.5, end: 0),
+              
+              const SizedBox(height: 16),
+              
+              TextButton(
+                onPressed: () {
+                  ApiConfig.isDemoMode = true;
+                  ref.read(demoModeProvider.notifier).state = true;
+                },
+                child: const Text(
+                  'Utiliser le mode Démo (sans Google)',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ).animate().fadeIn(delay: 600.ms),
             ],
           ),
         ),

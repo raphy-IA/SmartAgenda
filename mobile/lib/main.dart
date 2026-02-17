@@ -9,6 +9,8 @@ import 'core/services/notification_service.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/data/repositories/auth_repository.dart';
 
+final demoModeProvider = StateProvider<bool>((ref) => false);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
@@ -61,6 +63,11 @@ class AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final isDemoMode = ref.watch(demoModeProvider);
+
+    if (isDemoMode) {
+      return const DashboardScreen();
+    }
 
     return authState.when(
       data: (state) {

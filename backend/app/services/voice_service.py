@@ -7,22 +7,57 @@ from app.schemas.event import EventCreate
 class VoiceParsingService:
     
     @staticmethod
-    def parse_natural_language(text: str, user_timezone: str = "UTC", reference_time: str = None) -> EventCreate:
+    def parse_natural_language(text: str, user_timezone: str = "UTC", reference_time: str = None, language_hint: str = "auto") -> EventCreate:
         """
         Orchestrateur Principal : Stratégie de Cascade (Failover).
         Ordre : Groq (Rapide) -> Gemini (Google) -> OpenAI (Si clé) -> Mock (Secours)
         """
         errors = []
+        from datetime import timezone, timedelta
+        import re
+
+        # Helper pour parser l'offset "UTC+HH:MM"
+        def parse_tz_offset(tz_str):
+            try:
+                if not tz_str or tz_str == "UTC":
+                    return timezone.utc
+                match = re.match(r"UTC([+-])(\d{2}):(\d{2})", tz_str)
+                if match:
+                    sign = 1 if match.group(1) == '+' else -1
+                    return timezone(timedelta(hours=sign * int(match.group(2)), minutes=sign * int(match.group(3))))
+            except: pass
+            return timezone.utc
+
+        current_tz = parse_tz_offset(user_timezone)
         
-        # If no reference time provided, fallback to server time (UTC)
+        # If no reference time provided, fallback to server time (normalized to user TZ if possible)
         if not reference_time:
-             reference_time = datetime.now().isoformat()
+             # On prend le "now" du serveur mais on l'imagine dans la TZ de l'user
+             reference_time = datetime.now(current_tz).isoformat()
+        else:
+            # Si reference_time est fourni par le mobile, il est déjà ISO avec offset normalement.
+            pass
+
+        def post_process_event(event: EventCreate) -> EventCreate:
+            # L'IA a tendance à ajouter 'Z' par automatisme ISO8601.
+            # On force la TZ locale de l'utilisateur pour préserver les HEURES affichées.
+            def to_local_instant(dt):
+                if dt is None: return None
+                # Si Naive ou UTC pur, on considère que ce sont les chiffres locaux
+                if dt.tzinfo is None or dt.tzinfo == timezone.utc:
+                    return dt.replace(tzinfo=current_tz)
+                return dt
+
+            event.start_time = to_local_instant(event.start_time)
+            event.end_time = to_local_instant(event.end_time)
+            return event
 
         # 1. TENTATIVE GROQ (Priorité Vitesse/Gratuit)
         if settings.GROQ_API_KEY:
             try:
-                print("🤖 AI ENGINE: Trying Provider 'GROQ'...")
-                return VoiceParsingService._parse_with_groq(text, user_timezone, reference_time)
+                print(f"🤖 AI ENGINE: Trying Provider 'GROQ' (User TZ: {user_timezone}, Lang: {language_hint})...")
+                result = VoiceParsingService._parse_with_groq(text, user_timezone, reference_time, language_hint)
+                return post_process_event(result)
             except Exception as e:
                 print(f"⚠️ Failover: Groq failed ({e}). Switching to next...")
                 errors.append(f"Groq: {e}")
@@ -30,12 +65,9 @@ class VoiceParsingService:
         # 2. TENTATIVE GEMINI (Backup Puissant)
         if settings.GEMINI_API_KEY:
             try:
-                print("🤖 AI ENGINE: Trying Provider 'GEMINI'...")
-        # 2. TENTATIVE GEMINI (Backup Puissant)
-        if settings.GEMINI_API_KEY:
-            try:
-                print("🤖 AI ENGINE: Trying Provider 'GEMINI'...")
-                return VoiceParsingService._parse_with_gemini(text, user_timezone, reference_time)
+                print(f"🤖 AI ENGINE: Trying Provider 'GEMINI'...")
+                result = VoiceParsingService._parse_with_gemini(text, user_timezone, reference_time, language_hint)
+                return post_process_event(result)
             except Exception as e:
                 print(f"⚠️ Failover: Gemini failed ({e}). Switching to next...")
                 errors.append(f"Gemini: {e}")
@@ -44,11 +76,8 @@ class VoiceParsingService:
         if settings.OPENAI_API_KEY:
             try:
                 print("🤖 AI ENGINE: Trying Provider 'OPENAI'...")
-        # 3. TENTATIVE OPENAI (Dernier recours payant)
-        if settings.OPENAI_API_KEY:
-            try:
-                print("🤖 AI ENGINE: Trying Provider 'OPENAI'...")
-                return VoiceParsingService._parse_with_openai(text, user_timezone, reference_time)
+                result = VoiceParsingService._parse_with_openai(text, user_timezone, reference_time, language_hint)
+                return post_process_event(result)
             except Exception as e:
                 errors.append(f"OpenAI: {e}")
                 
@@ -56,11 +85,13 @@ class VoiceParsingService:
         print("❌ AI ALL PROVIDERS FAILED.")
         print(f"   Errors: {errors}")
         print("⚠️ Mode SECURE activé (Regex/Mock).")
-        return VoiceParsingService._get_mock_response(text)
+        # Le mock utilise datetime.now() donc on lui passe la TZ aussi
+        mock_result = VoiceParsingService._get_mock_response(text)
+        return post_process_event(mock_result)
 
     # --- PROVIDER: GROQ (LLAMA 3) ---
     @staticmethod
-    def _parse_with_groq(text: str, user_timezone: str, current_time: str) -> EventCreate:
+    def _parse_with_groq(text: str, user_timezone: str, current_time: str, language: str = "auto") -> EventCreate:
         from groq import Groq
         
         if not settings.GROQ_API_KEY:
@@ -69,7 +100,7 @@ class VoiceParsingService:
         client = Groq(api_key=settings.GROQ_API_KEY)
         # current_time is passed as argument
         
-        system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
+        system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone, language)
 
         # Llama 3 on Groq
         print("🤖 AI ENGINE: Using Groq (Llama-3.3-70b-versatile)...")
@@ -118,7 +149,7 @@ class VoiceParsingService:
 
     # --- PROVIDER: OPENAI ---
     @staticmethod
-    def _parse_with_openai(text: str, user_timezone: str, current_time: str) -> EventCreate:
+    def _parse_with_openai(text: str, user_timezone: str, current_time: str, language: str = "auto") -> EventCreate:
         from openai import OpenAI
         
         if not settings.OPENAI_API_KEY:
@@ -127,7 +158,7 @@ class VoiceParsingService:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         # current_time is passed as argument
         
-        system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
+        system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone, language)
 
         response = client.chat.completions.create(
             model=settings.OPENAI_MODEL,
@@ -154,7 +185,7 @@ class VoiceParsingService:
 
     # --- PROVIDER: GOOGLE GEMINI ---
     @staticmethod
-    def _parse_with_gemini(text: str, user_timezone: str, current_time: str) -> EventCreate:
+    def _parse_with_gemini(text: str, user_timezone: str, current_time: str, language: str = "auto") -> EventCreate:
         import google.generativeai as genai
         
         if not settings.GEMINI_API_KEY:
@@ -178,9 +209,9 @@ class VoiceParsingService:
             "top_k": 64,
             "max_output_tokens": 8192,
             "response_mime_type": "application/json",
+        }
 
-
-        system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone)
+        system_prompt = VoiceParsingService._get_system_prompt(current_time, user_timezone, language)
         full_prompt = f"{system_prompt}\n\nUSER REQUEST: {text}"
 
         # Liste des modèles détectés comme disponibles pour l'utilisateur
@@ -255,10 +286,20 @@ class VoiceParsingService:
 
     # --- UTILS ---
     @staticmethod
-    def _get_system_prompt(current_time: str, timezone: str) -> str:
+    def _get_system_prompt(current_time: str, timezone: str, language: str = "auto") -> str:
+        lang_instruction = ""
+        if language == "fr":
+            lang_instruction = "IMPORTANT: L'utilisateur s'exprime en FRANÇAIS. Analyse le texte en tant que français."
+        elif language == "en":
+            lang_instruction = "IMPORTANT: The user is speaking ENGLISH. Analyze the text as English."
+        else:
+            lang_instruction = "Détecte automatiquement si l'utilisateur parle en Français ou en Anglais."
+
         return f"""
         Tu es un assistant personnel expert en gestion d'agenda.
         Nous sommes le {current_time} (Timezone: {timezone}).
+        {lang_instruction}
+        
         Ta mission : Extraire les détails d'un événement à partir du texte utilisateur.
         
         Retourne UNIQUEMENT un JSON valide respectant ce format :

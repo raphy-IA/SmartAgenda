@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +9,8 @@ class AuthRepository {
 
   AuthRepository(this._supabase) 
       : _googleSignIn = GoogleSignIn(
-          serverClientId: "31548980170-3mpqeqaqbspfftdppl9b30ijn29kv38q.apps.googleusercontent.com",
+          clientId: kIsWeb ? "31548980170-3mpqeqaqbspfftdppl9b30ijn29kv38q.apps.googleusercontent.com" : null,
+          serverClientId: kIsWeb ? null : "31548980170-3mpqeqaqbspfftdppl9b30ijn29kv38q.apps.googleusercontent.com",
         );
 
   Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
@@ -32,6 +34,13 @@ class AuthRepository {
       idToken: idToken,
       accessToken: accessToken,
     );
+  }
+
+  Future<void> signInAsGuest() async {
+    // Note: This matches a test user or creates an anonymous session
+    // For local development, we use Supabase anonymous login if enabled, 
+    // or just trigger the auth state change to unblock the UI.
+    await _supabase.auth.signInAnonymously();
   }
 
   Future<void> signOut() async {

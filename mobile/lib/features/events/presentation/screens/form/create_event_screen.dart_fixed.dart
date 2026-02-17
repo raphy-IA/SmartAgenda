@@ -1,24 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_agenda_ai/core/constants/app_colors.dart';
-import 'package:smart_agenda_ai/features/events/data/models/event.dart';
-import 'package:smart_agenda_ai/features/events/presentation/providers/event_providers.dart';
-import 'package:dio/dio.dart';
-
-import 'package:smart_agenda_ai/core/theme/event_theme_helper.dart';
-import 'package:smart_agenda_ai/core/services/notification_service.dart';
-import 'package:intl/intl.dart';
-import 'package:smart_agenda_ai/features/events/data/repositories/event_repository.dart';
-
-class CreateEventScreen extends ConsumerStatefulWidget {
-  final Event? eventToEdit;
-
-  const CreateEventScreen({super.key, this.eventToEdit});
-
-  @override
-  ConsumerState<CreateEventScreen> createState() => _CreateEventScreenState();
-}
-
 class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();

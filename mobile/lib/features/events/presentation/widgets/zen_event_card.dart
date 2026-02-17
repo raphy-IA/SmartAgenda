@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../data/models/event.dart';
+import 'package:smart_agenda_ai/core/constants/app_colors.dart';
+import 'package:smart_agenda_ai/features/events/data/models/event.dart';
+import 'package:smart_agenda_ai/core/theme/event_theme_helper.dart';
 
-import '../../../../core/theme/event_theme_helper.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_agenda_ai/features/events/presentation/providers/event_providers.dart';
+import 'package:smart_agenda_ai/features/events/presentation/screens/details/event_details_screen.dart';
 
-class ZenEventCard extends StatelessWidget {
+class ZenEventCard extends ConsumerWidget {
   final Event event;
   final VoidCallback? onTap;
 
@@ -17,7 +20,10 @@ class ZenEventCard extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Check for conflict
+    final hasConflict = ref.watch(eventConflictProvider(event.id));
+
     // INFO METADATA
     final meta = event.metadata ?? {};
     final String? category = meta['suggested_category'];
@@ -195,11 +201,22 @@ class ZenEventCard extends StatelessWidget {
                         ),
                       ),
                       
-                      // Icone de statut
-                      if (event.status == 'tentative')
-                         Icon(Icons.warning_amber_rounded, color: AppColors.error.withOpacity(0.8))
-                      else 
-                         Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary.withOpacity(0.5)),
+                      // Icone de statut & Conflit
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasConflict)
+                            const Tooltip(
+                              message: "Chevauchement avec un autre événement",
+                              child: Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                            ),
+                          const SizedBox(width: 4),
+                          if (event.status == 'tentative')
+                             Icon(Icons.help_outline, color: AppColors.error.withOpacity(0.8))
+                          else 
+                             Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary.withOpacity(0.5)),
+                        ],
+                      ),
                     ],
                   ),
                 ),

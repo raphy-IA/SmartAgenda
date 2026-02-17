@@ -4,16 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../voice/presentation/notifiers/voice_controller.dart';
 import '../providers/event_providers.dart';
 import '../widgets/zen_event_card.dart';
+import '../widgets/calendar_widget.dart';
 import 'details/event_details_screen.dart';
 import 'form/create_event_screen.dart';
 import '../../../../core/services/notification_service.dart';
 
 import '../../../../core/theme/event_theme_helper.dart';
 import '../../data/repositories/category_repository.dart';
+import 'package:smart_agenda_ai/features/events/data/models/event.dart';
+import 'package:smart_agenda_ai/features/events/data/repositories/event_repository.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -27,7 +31,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch Dynamic Categories on startup
     _loadCategories();
   }
 
@@ -36,7 +39,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final repo = CategoryRepository();
       final cats = await repo.getCategories();
       EventThemeHelper.updateCache(cats);
-      if (mounted) setState(() {}); // Refresh UI
+      if (mounted) setState(() {});
     } catch (e) {
       print("Failed to load categories: $e");
     }
@@ -44,7 +47,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final eventsAsync = ref.watch(eventsProvider);
+    final eventsAsync = ref.watch(filteredEventsProvider);
+    final allEventsAsync = ref.watch(eventsProvider); // For markers
+    final selectedDate = ref.watch(selectedDateProvider);
+    final focusedDay = ref.watch(focusedDayProvider);
+    final calendarFormat = ref.watch(calendarFormatProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -55,25 +62,60 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              // --- DIAGNOSTIC ---
-              // --- DIAGNOSTIC REMOVED ---
-              const SizedBox(height: 20),
-              // Header Zen
               _buildHeader(context),
               
+              const SizedBox(height: 24),
+              
+              // --- CALENDRIER ---
+              CustomCalendar(
+                focusedDay: focusedDay,
+                selectedDay: selectedDate,
+                format: calendarFormat,
+                events: allEventsAsync.maybeWhen(data: (d) => d,orElse: () => []),
+                onDaySelected: (selected, focused) {
+                  ref.read(focusedDayProvider.notifier).state = focused;
+                  // Si on reclique sur le même jour, on déselectionne pour revenir au mode 30 jours
+                  if (isSameDay(selectedDate, selected)) {
+                    ref.read(selectedDateProvider.notifier).state = null;
+                  } else {
+                    ref.read(selectedDateProvider.notifier).state = selected;
+                  }
+                },
+                onFormatChanged: (format) {
+                  ref.read(calendarFormatProvider.notifier).state = format;
+                },
+                onPageChanged: (focused) {
+                  ref.read(focusedDayProvider.notifier).state = focused;
+                },
+              ).animate().fadeIn(duration: 400.ms),
+
               const SizedBox(height: 30),
               
-              // Timeline Label
-              Text(
-                'Timeline',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1.0,
-                ),
+              // Timeline Label dynamique
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    selectedDate != null 
+                      ? 'PROGRAMME DU JOUR' 
+                      : (calendarFormat == CalendarFormat.week 
+                          ? 'PROGRAMME DE LA SEMAINE' 
+                          : 'PROGRAMME DU MOIS'),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  if (selectedDate != null)
+                    TextButton(
+                      onPressed: () => ref.read(selectedDateProvider.notifier).state = null,
+                      child: const Text('Voir tout', style: TextStyle(color: AppColors.primary, fontSize: 12)),
+                    ),
+                ],
               ).animate().fadeIn(delay: 200.ms),
               
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               
               // Liste des Events
               Expanded(
@@ -84,71 +126,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.spa_outlined, size: 64, color: AppColors.secondary),
+                            const Icon(Icons.spa_outlined, size: 48, color: AppColors.secondary),
                             const SizedBox(height: 16),
-                            const Text(
-                              'Aucun événement.\nProfitez du calme.',
+                            Text(
+                              selectedDate == null 
+                                ? 'Aucun événement à venir.\nProfitez du calme.'
+                                : 'Rien de prévu ce jour.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                             ),
                           ],
-                        ).animate().fadeIn().scale(),
+                        ).animate().fadeIn(),
                       );
                     }
 
-                    // 1. Trier par date
+                    // Trier par date
                     events.sort((a, b) => a.startTime.compareTo(b.startTime));
 
-                    // 2. Grouper par mois
-                    // Map<"Janvier 2026", List<Event>>
-                    final Map<String, List<dynamic>> groupedEvents = {};
-                    
-                    for (var event in events) {
-                      final String monthKey = DateFormat('MMMM yyyy', 'fr_FR').format(event.startTime);
-                      // Capitalize first letter
-                      final String formattedKey = monthKey[0].toUpperCase() + monthKey.substring(1);
-                      
-                      if (!groupedEvents.containsKey(formattedKey)) {
-                        groupedEvents[formattedKey] = [];
-                      }
-                      groupedEvents[formattedKey]!.add(event);
-                    }
-
-                    // 3. Afficher la liste groupée
+                    // Liste simple (pas besoin de re-grouper par mois si on a peu d'events ou si c'est filtré par jour)
                     return ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      itemCount: groupedEvents.length,
+                      itemCount: events.length,
                       itemBuilder: (context, index) {
-                        final String month = groupedEvents.keys.elementAt(index);
-                        final List<dynamic> monthEvents = groupedEvents[month]!;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // En-tête mois
-                            Container(
-                              margin: const EdgeInsets.only(top: 24, bottom: 12),
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                              child: Text(
-                                month,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                            // Liste des events pour ce mois
-                            ...monthEvents.map((event) => ZenEventCard(
-                              event: event,
-                              onTap: () => Navigator.push(
-                                context, 
-                                MaterialPageRoute(builder: (_) => EventDetailsScreen(event: event))
-                              ),
-                            )).toList(),
-                          ],
-                        );
+                        final event = events[index];
+                        return ZenEventCard(
+                          event: event,
+                          onTap: () => Navigator.push(
+                            context, 
+                            MaterialPageRoute(builder: (_) => EventDetailsScreen(event: event))
+                          ),
+                        ).animate().fadeIn(delay: (index * 50).ms).slideX(begin: 0.1, end: 0);
                       },
                     );
                   },
@@ -224,10 +231,92 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ],
     ).animate().fadeIn().slideY(begin: -0.5, end: 0);
   }
-
-
-
 }
+
+  void _showVoiceConflictDialog(BuildContext context, WidgetRef ref, Event event, ConflictException conflict) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final voiceState = ref.watch(voiceControllerProvider);
+          final voiceController = ref.read(voiceControllerProvider.notifier);
+          final isProcessing = voiceState.isProcessing;
+
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                SizedBox(width: 10),
+                Text("Conflit Détecté (Voix)", style: TextStyle(color: AppColors.textPrimary)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  conflict.message,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Que souhaitez-vous faire ?",
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                
+                // Suggestions de l'IA
+                if (conflict.suggestions.isNotEmpty) ...[
+                  const Text("Suggestions de l'IA :", style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  ...conflict.suggestions.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary.withOpacity(0.1),
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        minimumSize: const Size(double.infinity, 45),
+                      ),
+                      onPressed: isProcessing ? null : () {
+                        // On ne pop plus immédiatement pour garder le contrôle visuel si possible,
+                        // mais VoiceController s'occupe de fermer via state change ou on pop après succès.
+                        // En fait, resolveWithSuggestion s'occupe de tout. On pop juste avant de lancer.
+                        Navigator.pop(context);
+                        voiceController.resolveWithSuggestion(Map<String, dynamic>.from(s));
+                      },
+                      child: isProcessing 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Text(s['label']),
+                    ),
+                  )),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isProcessing ? null : () {
+                  Navigator.pop(context);
+                  voiceController.clearConflict();
+                },
+                child: const Text("ANNULER", style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                onPressed: isProcessing ? null : () {
+                  Navigator.pop(context);
+                  voiceController.forceCreateAfterConflict();
+                },
+                child: const Text("MAINTENIR QUAND MÊME", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
 class VoiceFloatingActionButton extends ConsumerWidget {
 
@@ -237,6 +326,13 @@ class VoiceFloatingActionButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final voiceState = ref.watch(voiceControllerProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
+
+    // ÉCOUTEUR DE CONFLIT
+    ref.listen(voiceControllerProvider, (prev, next) {
+      if (next.conflict != null && next.pendingEvent != null && next.conflict != prev?.conflict) {
+        _showVoiceConflictDialog(context, ref, next.pendingEvent!, next.conflict!);
+      }
+    });
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -290,7 +386,7 @@ class VoiceFloatingActionButton extends ConsumerWidget {
             ),
           ).animate().fadeIn(),
 
-        if (voiceState.text.isNotEmpty && !voiceState.isListening && !voiceState.isProcessing)
+        if (voiceState.text.isNotEmpty && !voiceState.isListening && !voiceState.isProcessing && voiceState.conflict == null)
           // CAS 1 : Texte capturé -> Valider ou Annuler
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -334,14 +430,20 @@ class VoiceFloatingActionButton extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: voiceState.localeId == "fr-FR" ? AppColors.primary : AppColors.textSecondary),
+                          border: Border.all(
+                            color: voiceState.mode == VoiceLanguageMode.auto
+                              ? AppColors.textSecondary
+                              : AppColors.primary
+                          ),
                         ),
                         child: Text(
-                          voiceState.localeId == "fr-FR" ? "FR" : "AUTO",
+                          voiceState.mode.name.toUpperCase(),
                           style: TextStyle(
-                            color: voiceState.localeId == "fr-FR" ? AppColors.primary : AppColors.textSecondary,
+                            color: voiceState.mode == VoiceLanguageMode.auto
+                              ? AppColors.textSecondary
+                              : AppColors.primary,
                             fontWeight: FontWeight.bold,
-                            fontSize: 12
+                            fontSize: 10,
                           ),
                         ),
                       ),
@@ -352,7 +454,7 @@ class VoiceFloatingActionButton extends ConsumerWidget {
                 GestureDetector(
                 onTap: () {
                   if (voiceState.isListening) {
-                    voiceController.stopAndSend(); 
+                    voiceController.stopListening(); 
                   } else {
                     voiceController.startListening();
                   }

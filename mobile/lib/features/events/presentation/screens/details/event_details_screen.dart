@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../../../core/constants/app_colors.dart';
-import '../../../data/models/event.dart';
-import '../../providers/event_providers.dart';
-import '../form/create_event_screen.dart';
-
-import '../../../../../core/theme/event_theme_helper.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:smart_agenda_ai/core/constants/app_colors.dart';
+import 'package:smart_agenda_ai/features/events/data/models/event.dart';
+import 'package:smart_agenda_ai/features/events/presentation/providers/event_providers.dart';
+import 'package:smart_agenda_ai/features/events/presentation/screens/form/create_event_screen.dart';
+import 'package:smart_agenda_ai/core/theme/event_theme_helper.dart';
 
 class EventDetailsScreen extends ConsumerWidget {
   final Event event;
@@ -92,7 +92,33 @@ class EventDetailsScreen extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  
+                  // BANNIÈRE CONFLIT
+                  if (ref.watch(eventConflictProvider(event.id)))
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              "Cet événement chevauche un autre rendez-vous.",
+                              style: TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().shake(),
+                    
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       const Icon(Icons.access_time, color: AppColors.primary),
@@ -259,15 +285,14 @@ class EventDetailsScreen extends ConsumerWidget {
             child: const Text('Supprimer', style: TextStyle(color: AppColors.error)),
             onPressed: () async {
               try {
-                await ref.read(eventRepositoryProvider).deleteEvent(event.id);
-                // Rafraîchir la liste
-                ref.invalidate(eventsProvider);
+                await ref.read(eventsProvider.notifier).deleteEvent(event.id);
                 
-                Navigator.pop(ctx); // Close Dialog
-                Navigator.pop(context); // Close Screen
+                if (Navigator.canPop(ctx)) Navigator.pop(ctx); // Close Dialog
+                if (Navigator.canPop(context)) Navigator.pop(context); // Close Screen
+                
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Événement supprimé')));
               } catch (e) {
-                Navigator.pop(ctx);
+                if (Navigator.canPop(ctx)) Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
               }
             },
