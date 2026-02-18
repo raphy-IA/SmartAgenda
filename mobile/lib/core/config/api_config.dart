@@ -10,7 +10,7 @@ class ApiConfig {
   static const String vpsUrl = "2a02:4780:2d:a183::1"; // À remplacer par domaine si possible
 
   static String get baseUrl {
-    // En mode RELEASE (APK final), on utilise le VPS
+    // En mode RELEASE (APK final), on utilise le VPS sur le port 8001
     if (kReleaseMode) {
       return "http://$vpsUrl:8001/api/v1";
     }
