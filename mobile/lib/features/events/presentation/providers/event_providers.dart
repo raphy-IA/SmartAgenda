@@ -4,6 +4,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:smart_agenda_ai/features/events/data/repositories/event_repository.dart';
 import 'package:smart_agenda_ai/features/events/data/models/event.dart';
 import 'package:smart_agenda_ai/core/services/notification_service.dart';
+import 'package:smart_agenda_ai/features/profile/presentation/providers/profile_providers.dart';
 
 final supabaseClientProvider = Provider((ref) => Supabase.instance.client);
 

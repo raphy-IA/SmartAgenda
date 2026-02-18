@@ -16,8 +16,8 @@ import '../../../../core/theme/event_theme_helper.dart';
 import '../../data/repositories/category_repository.dart';
 import 'package:smart_agenda_ai/features/events/data/models/event.dart';
 import 'package:smart_agenda_ai/features/events/data/repositories/event_repository.dart';
-import '../../profile/presentation/providers/profile_providers.dart';
-import '../../profile/presentation/screens/settings_screen.dart';
+import 'package:smart_agenda_ai/features/profile/presentation/providers/profile_providers.dart';
+import 'package:smart_agenda_ai/features/profile/presentation/screens/settings_screen.dart';
 import 'package:smart_agenda_ai/features/profile/data/models/user_profile.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {

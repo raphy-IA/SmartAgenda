@@ -38,7 +38,7 @@ class UserProfile {
       userId: userId,
       chronotype: chronotype ?? this.chronotype,
       freezeMode: freezeMode ?? this.freezeMode,
-      workCapacityLimit: work_capacity_limit ?? this.workCapacityLimit,
+      workCapacityLimit: workCapacityLimit ?? this.workCapacityLimit,
     );
   }
 }
