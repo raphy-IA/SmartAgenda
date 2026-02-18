@@ -11,6 +11,20 @@ Le système est composé de trois briques principales :
 
 ---
 
+## 🚩 CONFIGURATION STABLE & VALIDÉE (NE PAS MODIFIER)
+
+> [!CAUTION]
+> Ces paramètres ont été testés après plusieurs erreurs de réseau. **Toute modification peut casser la connexion mobile.**
+
+| Paramètre | Valeur Validée | Pourquoi ? |
+| :--- | :--- | :--- |
+| **IP VPS (vpsUrl)** | `148.230.80.83` | L'IPv4 est plus universelle que l'IPv6 pour Android. |
+| **Binding Docker** | `--host 0.0.0.0` | Permet le pontage réseau correct sur Hostinger. (Pas de `::`). |
+| **Port Externe** | `8001` | Ouvert dans le pare-feu du VPS et libre de tout conflit. |
+| **Protocole** | `http://` | Android exige `usesCleartextTraffic="true"` dans le Manifest pour fonctionner. |
+
+---
+
 ## 💻 Environnement Local (Développement)
 
 ### 1. Backend IA
