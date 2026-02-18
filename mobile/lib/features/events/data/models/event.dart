@@ -26,9 +26,9 @@ class Event {
       startTime: DateTime.parse(json['start_time'] as String).toLocal(),
       endTime: DateTime.parse(json['end_time'] as String).toLocal(),
       location: json['location'] as String?,
-      status: json['status'] as String,
+      status: json['status'] as String? ?? 'confirmed',
       categoryId: json['category_id'] as String?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      metadata: json['metadata'] as Map<String, dynamic>? ?? {},
     );
   }
 
