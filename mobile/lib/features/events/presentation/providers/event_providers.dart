@@ -42,8 +42,8 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
         }
       }
 
-      // Programmer le digest du soir
-      _notifications.scheduleEveDigest(events);
+      // Programmer les briefings (Soir et Matin)
+      _notifications.scheduleDailyDigests(events);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }

@@ -92,12 +92,12 @@ class NotificationService {
       startTime.subtract(const Duration(hours: 1)),
     );
 
-    // 2. Rappel 5 min avant (ID: hash + 2)
+    // 2. Rappel 10 min avant (ID: hash + 2)
     await scheduleNotification(
       baseId + 2,
-      "C'est bientôt ! : $title",
-      "Début dans 5 minutes. Préparez-vous.",
-      startTime.subtract(const Duration(minutes: 5)),
+      "Préparez-vous : $title",
+      "Début dans 10 minutes.",
+      startTime.subtract(const Duration(minutes: 10)),
       isHighPriority: true,
     );
 
@@ -150,41 +150,59 @@ class NotificationService {
     await _notificationsPlugin.cancel(baseId + 3);
   }
 
-  Future<void> scheduleEveDigest(List<Event> allEvents) async {
-    // 1. Filtrer les événements de DEMAIN
-    final tomorrow = DateTime.now().add(const Duration(days: 1));
-    final tomorrowEvents = allEvents.where((e) => 
-      e.startTime.year == tomorrow.year && 
-      e.startTime.month == tomorrow.month && 
-      e.startTime.day == tomorrow.day &&
-      e.status != 'cancelled'
-    ).toList();
-
-    if (tomorrowEvents.isEmpty) return;
-
-    // 2. Préparer le message
-    tomorrowEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
-    final firstEvent = tomorrowEvents.first;
-    final String timeStr = "${firstEvent.startTime.hour}h${firstEvent.startTime.minute.toString().padLeft(2, '0')}";
-    
-    final String body = tomorrowEvents.length == 1 
-      ? "Demain : 1 rendez-vous à $timeStr."
-      : "Demain : ${tomorrowEvents.length} rendez-vous. Le premier à $timeStr.";
-
-    // 3. Programmer pour CE SOIR à 20h00
+  Future<void> scheduleDailyDigests(List<Event> allEvents) async {
     final now = DateTime.now();
-    var scheduledDate = DateTime(now.year, now.month, now.day, 20, 0);
-    
-    // Si il est déjà plus de 20h, on ne programme pas pour aujourd'hui
-    if (scheduledDate.isBefore(now)) return;
 
-    await scheduleNotification(
-      999999, // ID unique pour le digest
-      "Briefing de demain 📋",
-      body,
-      scheduledDate,
-      isHighPriority: true,
-    );
+    // --- 1. SOIR (20h) pour DEMAIN ---
+    final tomorrow = now.add(const Duration(days: 1));
+    final tomorrowEvents = _filterEventsForDay(allEvents, tomorrow);
+    
+    if (tomorrowEvents.isNotEmpty) {
+      final scheduledEve = DateTime(now.year, now.month, now.day, 20, 0);
+      if (scheduledEve.isAfter(now)) {
+        await _scheduleDigestNotification(
+          999999, 
+          "Briefing de demain 📋", 
+          _buildDigestMessage(tomorrowEvents, "Demain"),
+          scheduledEve
+        );
+      }
+    }
+
+    // --- 2. MATIN (06h) pour AUJOURD'HUI ---
+    final todayEvents = _filterEventsForDay(allEvents, now);
+    if (todayEvents.isNotEmpty) {
+      final scheduledMorn = DateTime(now.year, now.month, now.day, 6, 0);
+      if (scheduledMorn.isAfter(now)) {
+        await _scheduleDigestNotification(
+          888888, 
+          "Votre journée ☕", 
+          _buildDigestMessage(todayEvents, "Aujourd'hui"),
+          scheduledMorn
+        );
+      }
+    }
+  }
+
+  List<Event> _filterEventsForDay(List<Event> events, DateTime day) {
+    return events.where((e) => 
+      e.startTime.year == day.year && 
+      e.startTime.month == day.month && 
+      e.startTime.day == day.day &&
+      e.status != 'cancelled'
+    ).toList()..sort((a, b) => a.startTime.compareTo(b.startTime));
+  }
+
+  String _buildDigestMessage(List<Event> events, String dayPrefix) {
+    final firstEvent = events.first;
+    final String timeStr = "${firstEvent.startTime.hour}h${firstEvent.startTime.minute.toString().padLeft(2, '0')}";
+    return events.length == 1 
+      ? "$dayPrefix : 1 rendez-vous à $timeStr."
+      : "$dayPrefix : ${events.length} rendez-vous. Le premier à $timeStr.";
+  }
+
+  Future<void> _scheduleDigestNotification(int id, String title, String body, DateTime date) async {
+    await scheduleNotification(id, title, body, date, isHighPriority: true);
   }
 
   Future<void> cancelAll() async {
