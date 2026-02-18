@@ -3,32 +3,34 @@
 ## 🖥 Développement Local (PC)
 - **Backend IA** :
   ```powershell
-  cd backend
-  ..\venv\Scripts\Activate.ps1
-  uvicorn app.main:app --reload --port 8001
+  cd backend ; ..\venv\Scripts\Activate.ps1 ; uvicorn app.main:app --reload --port 8001
   ```
-- **Frontend App** :
+- **Lancer l'App** :
   ```powershell
   cd mobile
-  flutter run -d chrome  # Web (Mode Démo)
-  flutter run -d android # Mobile physique ou émulateur
+  flutter run -d chrome  # Web
+  flutter run -d android # Mobile (F5 dans VS Code est plus simple)
   ```
 
-## 🚀 Mise à jour Production (VPS)
-1. **Pousser le code local** :
+## 📦 Construire & Installer l'APK (Sans Drive)
+1. **Générer l'APK** : 
    ```powershell
-   git add .
-   git commit -m "Mise à jour"
-   git push
+   cd mobile ; flutter build apk --release
    ```
-2. **Déployer sur VPS** (via Docker) :
+2. **Installer sur téléphone branché** :
+   ```powershell
+   cd mobile ; flutter install
+   ```
+
+## 🚀 Mise à jour Production (VPS)
+1. **Pousser le code** : `git add . ; git commit -m "maj" ; git push`
+2. **Déployer sur VPS** : 
    ```bash
-   # Connectez-vous en SSH à votre VPS, puis :
    cd /home/raphyai82/apps/SmartAgenda/SmartAgenda
    git pull origin main
    docker compose up -d --build backend
    ```
-3. **Récupérer l'APK** : Allez sur votre dépôt GitHub -> Onglet **Actions** -> Dernier run réussi -> Section **Artifacts** (en bas).
+3. **Récupérer l'APK** : GitHub -> Actions -> Artifacts.
 
 ---
 💡 *Plus de détails techniques dans le [**MASTER_DEVELOPER_GUIDE.md**](../../MASTER_DEVELOPER_GUIDE.md)*

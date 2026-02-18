@@ -28,9 +28,37 @@ Le backend doit tourner pour que le micro et l'IA fonctionnent.
 
 ### 2. Application Mobile
 - **Dossier** : `mobile/`
-- **Lancer sur Chrome** : `flutter run -d chrome`
-- **Lancer sur Android** : `flutter run -d android`
+- **Lancer localement** :
+  - Sur Chrome : `flutter run -d chrome`
+  - Sur Android (USB/Simulateur) : `flutter run -d android`
+- **Générer l'APK localement** :
+  ```bash
+  cd mobile
+  flutter build apk --release
+  ```
+  *L'APK sera dans : `build/app/outputs/flutter-apk/app-release.apk`*
+
 - **Configuration API** : Se gère dans `lib/core/config/api_config.dart`.
+
+---
+
+## 📲 Transfert et Installation de l'APK
+
+Il existe des méthodes plus rapides que Google Drive :
+
+### 1. Installation directe (Recommandé - USB)
+Si votre téléphone est branché en USB à votre PC :
+```bash
+cd mobile
+flutter install
+```
+*Cette commande prend l'APK déjà construit et l'installe directement sur le téléphone.*
+
+### 2. Transfert par réseau local (Sans câble)
+Si vous ne voulez pas de câble, lancez un mini-serveur sur votre PC :
+1. Dans le dossier où se trouve l'APK, tapez : `python -m http.server 8080`
+2. Sur votre téléphone, allez sur `http://IP-DE-VOTRE-PC:8080`
+3. Cliquez sur l'APK pour l'installer.
 
 ---
 
