@@ -62,9 +62,9 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
     }
   }
 
-  Future<void> updateEvent(Event event) async {
+  Future<void> updateEvent(Event event, {bool force = false}) async {
     try {
-      await _repository.updateEvent(event);
+      await _repository.updateEvent(event, force: force);
       
       // Annuler et reprogrammer
       _notifications.cancelEventNotifications(event.id.hashCode);

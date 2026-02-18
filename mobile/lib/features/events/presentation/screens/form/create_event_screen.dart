@@ -293,7 +293,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       setState(() => _isLoading = true);
       try {
         if (isEdit) {
-           await ref.read(eventsProvider.notifier).updateEvent(eventData);
+           await ref.read(eventsProvider.notifier).updateEvent(eventData, force: ignoreConflicts);
            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Événement modifié')));
         } else {
            await ref.read(eventsProvider.notifier).createEvent(eventData, ignoreConflicts: ignoreConflicts);

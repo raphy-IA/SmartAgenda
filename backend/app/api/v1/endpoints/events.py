@@ -139,14 +139,58 @@ async def update_event(
     request: Request,
     event_id: str,
     event_in: EventUpdate,
+    force: bool = Query(False)
 ):
     """
-    Update an event.
+    Update an event with conflict checks.
     """
     try:
         user_id = get_current_user_id(request.headers.get("Authorization"))
+        
+        # Check conflicts ONLY if time is changing or force is not used
+        # To be safe, we check if start_time or end_time is in event_in
+        if (event_in.start_time or event_in.end_time) and not force:
+            raw_events = EventService.get_user_events(user_id)
+            existing_events = []
+            for e in raw_events:
+                if str(e.get("id")) != event_id: # EXCLUDE self
+                    try:
+                        existing_events.append(Event.model_validate(e))
+                    except: pass
+
+            # Merge update with current event for detection
+            # 1. Get current event
+            all_raw = EventService.get_user_events(user_id)
+            current_raw = next((e for e in all_raw if str(e.get("id")) == event_id), None)
+            if not current_raw:
+                raise HTTPException(status_code=404, detail="Evénement introuvable")
+            
+            current_event = Event.model_validate(current_raw)
+            # Create a virtual event for detection
+            detector_event = current_event.model_copy(update=event_in.model_dump(exclude_unset=True))
+
+            from app.services.ai_engine import AIEngine
+            user_tz = request.headers.get("X-User-Timezone", "UTC")
+            conflicts = AIEngine.detect_conflicts(detector_event, existing_events, user_timezone_str=user_tz)
+            
+            if conflicts:
+                conflict_titles = [c.title for c in conflicts]
+                suggestions = AIEngine.find_suggestions(detector_event, existing_events, user_timezone_str=user_tz)
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "conflict_detected",
+                        "message": f"Conflit détecté avec : {', '.join(conflict_titles)}",
+                        "conflicting_events": [str(c.id) for c in conflicts],
+                        "suggestions": suggestions
+                    }
+                )
+
         return EventService.update_event(user_id, event_id, event_in)
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"ERROR UPDATE EVENT: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{event_id}")

@@ -20,6 +20,7 @@ class EventUpdate(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     location: Optional[str] = None
+    category_id: Optional[UUID] = None
     status: Optional[str] = None
     metadata: Optional[dict[str, Any]] = None
 

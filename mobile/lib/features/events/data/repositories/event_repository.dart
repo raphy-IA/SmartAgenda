@@ -83,11 +83,27 @@ class EventRepository {
     }
   }
 
-  Future<void> updateEvent(Event event) async {
+  Future<void> updateEvent(Event event, {bool force = false}) async {
     try {
-      await _dio.patch('$baseUrl/events/${event.id}', data: event.toJson());
+      final json = event.toJson();
+      json.remove('id'); // On ne met pas à jour la clé primaire
+      
+      await _dio.patch(
+        '$baseUrl/events/${event.id}', 
+        data: json,
+        queryParameters: {'force': force},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw ConflictException(
+          message: e.response?.data['detail']['message'] ?? "Conflit détecté",
+          suggestions: (e.response?.data['detail']['suggestions'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+        );
+      }
+      print("Erreur PATCH Event (Dio): $e");
+      throw e;
     } catch (e) {
-      print("Erreur PATCH Event: $e");
+      print("Erreur PATCH Event (Generic): $e");
       throw e;
     }
   }
