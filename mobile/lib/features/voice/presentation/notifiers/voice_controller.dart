@@ -134,6 +134,7 @@ class VoiceController extends StateNotifier<VoiceState> {
         return;
       }
 
+      LocaleName bestMatch;
       try {
         bestMatch = locales.firstWhere(
           (l) => l.localeId.toLowerCase().replaceAll("_", "-") == (nextMode == VoiceLanguageMode.fr ? "fr-fr" : "en-us")
