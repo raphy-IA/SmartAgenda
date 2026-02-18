@@ -12,7 +12,8 @@ class ApiConfig {
   static String get baseUrl {
     // En mode RELEASE (APK final), on utilise le VPS sur le port 8001
     if (kReleaseMode) {
-      return "http://$vpsUrl:8001/api/v1";
+      // NOTE: L'IP IPv6 doit être entre crochets [] dans une URL
+      return "http://[$vpsUrl]:8001/api/v1";
     }
 
     // En mode DEBUG (Chrome/Émulateur)
