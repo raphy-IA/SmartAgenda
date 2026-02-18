@@ -87,7 +87,11 @@ Le backend est hébergé sur un VPS Linux et tourne via Docker pour une stabilit
 1.  Faites vos modifications de code localement.
 2.  Poussez sur GitHub : `git add . ; git commit -m "Description" ; git push`.
 3.  **Sur le VPS** : Lancez le `docker compose` cité plus haut.
-4.  **Sur GitHub** : Récupérez l'APK généré automatiquement dans l'onglet **Actions**.
+4.  **Sur GitHub (Générer l'APK)** :
+    - Allez dans l'onglet **Actions**.
+    - Cliquez sur **"Build Android APK"** dans la barre latérale gauche.
+    - Cliquez sur le bouton **"Run workflow"** (en haut à droite).
+    - Une fois terminé, téléchargez l'APK dans la section **Artifacts**.
 
 ### Débogage
 - **Logs local** : Regardez le terminal où tourne `uvicorn`.

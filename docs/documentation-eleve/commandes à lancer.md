@@ -30,7 +30,7 @@
    git pull origin main
    docker compose up -d --build backend
    ```
-3. **Récupérer l'APK** : GitHub -> Actions -> Artifacts.
+3. **Générer l'APK** : Allez sur GitHub -> Actions -> Build Android APK -> **Run workflow**.
 
 ---
 💡 *Plus de détails techniques dans le [**MASTER_DEVELOPER_GUIDE.md**](../../MASTER_DEVELOPER_GUIDE.md)*
