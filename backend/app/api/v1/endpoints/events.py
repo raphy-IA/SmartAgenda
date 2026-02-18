@@ -20,8 +20,9 @@ def get_current_user_id(authorization: str):
              
         token = parts[1]
 
-        # --- BYPASS DEMO MODE ---
-        if token == "demo-token":
+        # --- BYPASS DEMO MODE (Development Only) ---
+        from app.core.config import settings
+        if token == "demo-token" and settings.ENVIRONMENT != "production":
             return "00000000-0000-0000-0000-000000000000"
 
         # Decode without verifying signature (requires secret) - Trusting the bearer for now 

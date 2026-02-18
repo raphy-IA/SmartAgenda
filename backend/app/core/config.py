@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SmartAgenda AI API"
     API_V1_STR: str = "/api/v1"
+    ENVIRONMENT: str = "development" # "development" or "production"
     
     # Supabase
     SUPABASE_URL: str = ""

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -107,19 +108,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               
               const SizedBox(height: 16),
               
-              TextButton(
-                onPressed: () {
-                  ApiConfig.isDemoMode = true;
-                  ref.read(demoModeProvider.notifier).state = true;
-                },
-                child: const Text(
-                  'Utiliser le mode Démo (sans Google)',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    decoration: TextDecoration.underline,
+              if (!kReleaseMode)
+                TextButton(
+                  onPressed: () {
+                    ApiConfig.isDemoMode = true;
+                    ref.read(demoModeProvider.notifier).state = true;
+                  },
+                  child: const Text(
+                    'Utiliser le mode Démo (sans Google)',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
-                ),
-              ).animate().fadeIn(delay: 600.ms),
+                ).animate().fadeIn(delay: 600.ms),
             ],
           ),
         ),
