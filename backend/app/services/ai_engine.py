@@ -104,14 +104,18 @@ class AIEngine:
         return conflicts
 
     @staticmethod
-    def find_suggestions(event_in: EventCreate, existing_events: List[Event], user_timezone_str: str = "UTC") -> List[dict]:
+    def find_suggestions(
+        event_in: EventCreate, 
+        existing_events: List[Event], 
+        user_timezone_str: str = "UTC", 
+        chronotype: str = "neutre"
+    ) -> List[dict]:
         """
-        Trouve des créneaux libres pour suggérer une reprogrammation.
+        Trouve des créneaux libres en tenant compte du profil énergétique (Chronotype).
         """
         from datetime import timedelta, timezone
         import re
 
-        # Helper pour parser l'offset (copié de detect_conflicts pour autonomie)
         def parse_tz(tz_str):
             try:
                 if not tz_str or tz_str == "UTC": return timezone.utc
@@ -124,13 +128,12 @@ class AIEngine:
 
         user_tz = parse_tz(user_timezone_str)
         duration = event_in.end_time - event_in.start_time
+        importance = event_in.metadata.get("importance_score", 2) if event_in.metadata else 2
         
-        # On cherche à partir du début de l'event original
         current_attempt = event_in.start_time.replace(tzinfo=user_tz)
         suggestions = []
         
         def is_slot_free(start, end, existing):
-            # Normaliser en UTC pour comparaison
             s_utc = start.astimezone(timezone.utc)
             e_utc = end.astimezone(timezone.utc)
             for e in existing:
@@ -140,29 +143,47 @@ class AIEngine:
                     return False
             return True
 
-        # Stratégie simple : On décale par paliers de 30 min sur les 48 prochaines heures
-        max_attempts = 48 * 2 
-        while len(suggestions) < 2 and max_attempts > 0:
+        # Périodes de Haute Énergie selon chronotype
+        # Matin: 08-12h, Soir: 17-21h
+        def is_high_energy_slot(dt, chrono):
+            if chrono == "matin": return 8 <= dt.hour <= 12
+            if chrono == "soir": return 17 <= dt.hour <= 21
+            return 9 <= dt.hour <= 18 # Neutre: journée standard
+
+        # On cherche par paliers
+        max_attempts = 100 
+        while len(suggestions) < 3 and max_attempts > 0:
             current_attempt += timedelta(minutes=30)
             candidate_end = current_attempt + duration
             
-            # Éviter la nuit profonde (22h - 07h en local)
-            if 7 <= current_attempt.hour < 22:
+            # 1. Protection Nuit (23h - 06h)
+            if 6 <= current_attempt.hour < 23:
                 if is_slot_free(current_attempt, candidate_end, existing_events):
-                    # Génération d'un label intelligent avec le jour
-                    now_local = datetime.now(user_tz)
-                    if current_attempt.date() == now_local.date():
-                        day_prefix = "Aujourd'hui"
-                    elif current_attempt.date() == (now_local + timedelta(days=1)).date():
-                        day_prefix = "Demain"
-                    else:
-                        day_prefix = current_attempt.strftime('%d/%m')
                     
-                    suggestions.append({
-                        "start_time": current_attempt.isoformat(),
-                        "end_time": candidate_end.isoformat(),
-                        "label": f"{day_prefix} à {current_attempt.strftime('%H:%M')}"
-                    })
+                    # 2. Priorisation Énergie pour les scores élevés (>3)
+                    # Si score élevé, on ne suggère QUE si c'est un créneau de haute énergie 
+                    # OU si on a déjà fait trop d'essais (pour ne pas rester coincé)
+                    is_peak = is_high_energy_slot(current_attempt, chronotype)
+                    should_suggest = True
+                    
+                    if importance >= 3 and not is_peak and max_attempts > 50:
+                        should_suggest = False # On attend un meilleur créneau
+                    
+                    if should_suggest:
+                        now_local = datetime.now(user_tz)
+                        day_prefix = "Aujourd'hui" if current_attempt.date() == now_local.date() else \
+                                     "Demain" if current_attempt.date() == (now_local + timedelta(days=1)).date() else \
+                                     current_attempt.strftime('%d/%m')
+                        
+                        label = f"{day_prefix} à {current_attempt.strftime('%H:%M')}"
+                        if is_peak and importance >= 3:
+                            label += " (Optimal ⚡)"
+
+                        suggestions.append({
+                            "start_time": current_attempt.isoformat(),
+                            "end_time": candidate_end.isoformat(),
+                            "label": label
+                        })
             
             max_attempts -= 1
 

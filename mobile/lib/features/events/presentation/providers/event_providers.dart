@@ -123,9 +123,23 @@ final filteredEventsProvider = Provider<AsyncValue<List<Event>>>((ref) {
       final startDate = DateTime(start.year, start.month, start.day);
       final endDate = DateTime(end.year, end.month, end.day);
       
+      final profileAsync = ref.watch(profileProvider);
+      final isFreeze = profileAsync.maybeWhen(data: (p) => p.freezeMode, orElse: () => false);
+
       final visibleEvents = events.where((e) {
-        return (e.startTime.isAfter(startDate) || isSameDay(e.startTime, startDate)) && 
-               e.startTime.isBefore(endDate);
+        // Filter by Date
+        final dateFilter = (e.startTime.isAfter(startDate) || isSameDay(e.startTime, startDate)) && 
+                           e.startTime.isBefore(endDate);
+        
+        if (!dateFilter) return false;
+
+        // Filter by Freeze Mode
+        if (isFreeze) {
+          // Hide unimportant events (Threshold 70)
+          return e.importanceScore >= 70;
+        }
+
+        return true;
       }).toList();
 
       // Trier par heure de début

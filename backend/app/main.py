@@ -34,11 +34,12 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"message": "Internal Server Error", "detail": str(exc)},
     )
 
-from app.api.v1.endpoints import events, voice, categories
+from app.api.v1.endpoints import events, voice, categories, profiles
 
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}/events", tags=["events"])
 app.include_router(voice.router, prefix=f"{settings.API_V1_STR}/voice", tags=["voice"])
 app.include_router(categories.router, prefix=f"{settings.API_V1_STR}/categories", tags=["categories"])
+app.include_router(profiles.router, prefix=f"{settings.API_V1_STR}/profiles", tags=["profiles"])
 
 @app.get("/")
 async def root():

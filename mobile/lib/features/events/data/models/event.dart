@@ -19,6 +19,8 @@ class Event {
     this.metadata,
   });
 
+  int get importanceScore => (metadata?['importance_score'] as int?) ?? 40;
+
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
       id: json['id'] as String,

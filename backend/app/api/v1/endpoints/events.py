@@ -89,12 +89,11 @@ async def create_event(
 
         # 2. Check Conflits (Uniquement si force=False)
         from app.services.ai_engine import AIEngine
+        from app.services.profile_service import ProfileService
         
-        user_tz = "UTC"
-        try:
-            # On essaye d'extraire la timezone du header X-User-Timezone ou via metadata
-            user_tz = request.headers.get("X-User-Timezone", "UTC")
-        except: pass
+        user_tz = request.headers.get("X-User-Timezone", "UTC")
+        profile = ProfileService.get_profile(user_id)
+        chrono = profile.get("chronotype", "neutre") if profile else "neutre"
 
         conflicts = AIEngine.detect_conflicts(event_in, existing_events, user_timezone_str=user_tz)
         
@@ -102,8 +101,8 @@ async def create_event(
             conflict_ids = [str(c.id) for c in conflicts]
             conflict_titles = [c.title for c in conflicts]
             
-            # AI suggestions for next free slots
-            suggestions = AIEngine.find_suggestions(event_in, existing_events, user_timezone_str=user_tz)
+            # AI suggestions for next free slots (CHRONOTYPE AWARE)
+            suggestions = AIEngine.find_suggestions(event_in, existing_events, user_timezone_str=user_tz, chronotype=chrono)
             
             raise HTTPException(
                 status_code=409,
@@ -170,12 +169,18 @@ async def update_event(
             detector_event = current_event.model_copy(update=event_in.model_dump(exclude_unset=True))
 
             from app.services.ai_engine import AIEngine
+            from app.services.profile_service import ProfileService
+            
             user_tz = request.headers.get("X-User-Timezone", "UTC")
+            profile = ProfileService.get_profile(user_id)
+            chrono = profile.get("chronotype", "neutre") if profile else "neutre"
+
             conflicts = AIEngine.detect_conflicts(detector_event, existing_events, user_timezone_str=user_tz)
             
             if conflicts:
                 conflict_titles = [c.title for c in conflicts]
-                suggestions = AIEngine.find_suggestions(detector_event, existing_events, user_timezone_str=user_tz)
+                # AI Suggestions (CHRONOTYPE AWARE)
+                suggestions = AIEngine.find_suggestions(detector_event, existing_events, user_timezone_str=user_tz, chronotype=chrono)
                 raise HTTPException(
                     status_code=409,
                     detail={

@@ -59,38 +59,43 @@ class EventService:
             
             if suggested_cat_name:
                 print(f"[EventService] AI Suggested Category: '{suggested_cat_name}'. Checking existence...")
-                # 1. Search existing (Case Insensitive)
-                # Note: ilike is better but Supabase-py uses .ilike() or just .eq() if text is exact.
-                # Let's try flexible search.
+                from app.services.ai_engine import AIEngine
                 try:
-                    cat_res = db.table("categories").select("id").ilike("name", suggested_cat_name).execute()
+                    cat_res = db.table("categories").select("*").ilike("name", suggested_cat_name).execute()
                     
                     category_id = None
+                    final_cat_name = suggested_cat_name
+                    
                     if cat_res.data and len(cat_res.data) > 0:
                         category_id = cat_res.data[0]["id"]
+                        final_cat_name = cat_res.data[0]["name"]
                         print(f"[EventService] Matched existing category ID: {category_id}")
                     else:
-                        # 2. Create if missing
                         print(f"[EventService] Category '{suggested_cat_name}' not found. Creating new...")
                         from app.utils.color_utils import generate_color_from_text
-                        
                         new_cat = {
                             "name": suggested_cat_name,
                             "color_hex": generate_color_from_text(suggested_cat_name),
-                            "priority_level": 5, # Default
+                            "priority_level": 5,
                             "is_default": False
                         }
-                        
                         cat_insert = db.table("categories").insert(new_cat).execute()
                         if cat_insert.data:
                             category_id = cat_insert.data[0]["id"]
-                            print(f"[EventService] Created new category ID: {category_id} (Color: {new_cat['color_hex']})")
                     
                     if category_id:
                         event_dict["category_id"] = category_id
                         
+                    # --- IMPORTANCE SCORE CALCULATION ---
+                    from app.schemas.event import EventCreate
+                    importance = AIEngine.calculate_importance_score(EventCreate.model_validate(event_dict), category_name=final_cat_name)
+                    if "metadata" not in event_dict or event_dict["metadata"] is None:
+                        event_dict["metadata"] = {}
+                    event_dict["metadata"]["importance_score"] = importance
+                    print(f"[EventService] Calculated Importance Score: {importance}")
+
                 except Exception as cat_e:
-                    print(f"⚠️ [EventService] Failed to process dynamic category: {cat_e} (Proceeding without category_id)")
+                    print(f"⚠️ [EventService] Failed to process dynamic category: {cat_e}")
 
             # --- INSERT EVENT ---
             print(f"[EventService] Inserting event: {event_dict}")
@@ -140,16 +145,26 @@ class EventService:
             raise e
 
     @staticmethod
-    def delete_event(user_id: str, event_id: str):
-        if EventService._is_mock_mode():
-            print(f"[EventService] MOCK MODE: Deleting event {event_id}")
-            # Suppression in-place pour éviter "global" keyword error
-            MOCK_DB_STORE[:] = [e for e in MOCK_DB_STORE if not (e["id"] == event_id and e["user_id"] == user_id)]
-            return
-
-        try:
-            db.table("events").delete().eq("id", event_id).eq("user_id", user_id).execute()
-        except Exception as e:
-            print(f"❌ DB ERROR: {e}. Falling back to MOCK.")
-            MOCK_DB_STORE[:] = [e for e in MOCK_DB_STORE if not (e["id"] == event_id and e["user_id"] == user_id)]
+    def get_daily_load(user_id: str, date_str: str) -> float:
+        """
+        Calcule la charge totale (en heures) pour un jour donné.
+        date_str format: YYYY-MM-DD
+        """
+        events = EventService.get_user_events(user_id)
+        total_minutes = 0
+        from datetime import datetime
+        
+        for e in events:
+            try:
+                # On compare la date simple (YYYY-MM-DD)
+                # Note: start_time est stocké en ISO UTC
+                e_date = e["start_time"].split("T")[0]
+                if e_date == date_str and e.get("status") != "cancelled":
+                    start = datetime.fromisoformat(e["start_time"].replace("Z", "+00:00"))
+                    end = datetime.fromisoformat(e["end_time"].replace("Z", "+00:00"))
+                    delta = end - start
+                    total_minutes += delta.total_seconds() / 60
+            except: pass
+            
+        return total_minutes / 60
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -13,11 +12,13 @@ import '../widgets/calendar_widget.dart';
 import 'details/event_details_screen.dart';
 import 'form/create_event_screen.dart';
 import '../../../../core/services/notification_service.dart';
-
 import '../../../../core/theme/event_theme_helper.dart';
 import '../../data/repositories/category_repository.dart';
 import 'package:smart_agenda_ai/features/events/data/models/event.dart';
 import 'package:smart_agenda_ai/features/events/data/repositories/event_repository.dart';
+import '../../profile/presentation/providers/profile_providers.dart';
+import '../../profile/presentation/screens/settings_screen.dart';
+import 'package:smart_agenda_ai/features/profile/data/models/user_profile.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -45,10 +46,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
   }
 
+  double _calculateDailyLoad(List<Event> events) {
+    final now = DateTime.now();
+    final todayEvents = events.where((e) => 
+      e.startTime.year == now.year && 
+      e.startTime.month == now.month && 
+      e.startTime.day == now.day && 
+      e.status != 'cancelled'
+    );
+    
+    int totalMinutes = 0;
+    for (final e in todayEvents) {
+      totalMinutes += e.endTime.difference(e.startTime).inMinutes;
+    }
+    return totalMinutes / 60.0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventsAsync = ref.watch(filteredEventsProvider);
-    final allEventsAsync = ref.watch(eventsProvider); // For markers
+    final allEventsAsync = ref.watch(eventsProvider); // For markers and load
+    final profileAsync = ref.watch(profileProvider);
+    
     final selectedDate = ref.watch(selectedDateProvider);
     final focusedDay = ref.watch(focusedDayProvider);
     final calendarFormat = ref.watch(calendarFormatProvider);
@@ -62,9 +81,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              _buildHeader(context),
+              _buildHeader(context, profileAsync),
               
-              const SizedBox(height: 24),
+              // --- BANNIERE BURNOUT / FREEZE ---
+              allEventsAsync.whenData((events) {
+                final load = _calculateDailyLoad(events);
+                final limit = profileAsync.maybeWhen(data: (p) => p.workCapacityLimit, orElse: () => 10);
+                final isFreeze = profileAsync.maybeWhen(data: (p) => p.freezeMode, orElse: () => false);
+
+                if (isFreeze) {
+                  return _buildAlertBanner(
+                    "Mode FREEZE actif 🧘", 
+                    "Les tâches secondaires sont masquées pour votre bien-être.",
+                    Colors.blueGrey
+                  );
+                }
+
+                if (load > limit) {
+                  return _buildAlertBanner(
+                    "Alerte Surcharge (Burnout) ⚠️", 
+                    "Vous avez ${load.toStringAsFixed(1)}h de travail aujourd'hui. C'est trop !",
+                    AppColors.error
+                  );
+                }
+                return const SizedBox.shrink();
+              }).maybeWhen(data: (w) => w, orElse: () => const SizedBox.shrink()),
+
+              const SizedBox(height: 16),
               
               // --- CALENDRIER ---
               CustomCalendar(
@@ -172,7 +215,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildAlertBanner(String title, String message, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(message, style: TextStyle(color: color.withOpacity(0.8), fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().shake(hz: 4, curve: Curves.easeInOutCubic);
+  }
+
+  Widget _buildHeader(BuildContext context, AsyncValue<UserProfile> profileAsync) {
     final now = DateTime.now();
     final greeting = now.hour < 12 ? 'Bonjour' : (now.hour < 18 ? 'Bon après-midi' : 'Bonsoir');
 
@@ -212,21 +283,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ],
         ),
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.add, color: AppColors.textPrimary),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CreateEventScreen())
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen())
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.add, color: AppColors.textPrimary),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateEventScreen())
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     ).animate().fadeIn().slideY(begin: -0.5, end: 0);
