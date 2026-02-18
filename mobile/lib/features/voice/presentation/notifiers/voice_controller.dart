@@ -289,13 +289,16 @@ class VoiceController extends StateNotifier<VoiceState> {
       } else if (e is DuplicateException) {
          state = state.copyWith(isProcessing: false, error: "Cet événement existe déjà.", text: '');
       } else if (e is DioException) {
-         if (e.response?.statusCode == 500) {
-            state = state.copyWith(isProcessing: false, error: "Erreur serveur. Réessayez.");
+         final detail = e.response?.data?['detail'] ?? e.message;
+         if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+            state = state.copyWith(isProcessing: false, error: "Délai d'attente dépassé. Vérifiez votre connexion.");
+         } else if (e.response?.statusCode == 500) {
+            state = state.copyWith(isProcessing: false, error: "Erreur serveur (500): $detail");
          } else {
-            state = state.copyWith(isProcessing: false, error: "Erreur réseau: ${e.message}");
+            state = state.copyWith(isProcessing: false, error: "Erreur réseau (${e.response?.statusCode ?? '??'}): $detail");
          }
       } else {
-        state = state.copyWith(isProcessing: false, error: e.toString());
+        state = state.copyWith(isProcessing: false, error: "Erreur: ${e.toString()}");
       }
     }
   }
