@@ -33,34 +33,50 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
   Future<void> updateChronotype(String chronotype) async {
     final current = state.value;
     if (current == null) return;
+    
+    // Optimistic update
+    final oldState = state;
+    state = AsyncValue.data(current.copyWith(chronotype: chronotype));
+
     try {
       final updated = await _repository.updateProfile({'chronotype': chronotype});
       state = AsyncValue.data(updated);
     } catch (e) {
-      print("Erreur update chronotype: $e");
+      state = oldState; // Rollback
+      rethrow;
     }
   }
 
   Future<void> toggleFreezeMode() async {
     final current = state.value;
     if (current == null) return;
+    
     final newMode = !current.freezeMode;
+    final oldState = state;
+    state = AsyncValue.data(current.copyWith(freezeMode: newMode));
+
     try {
       final updated = await _repository.updateProfile({'freeze_mode': newMode});
       state = AsyncValue.data(updated);
     } catch (e) {
-      print("Erreur update freeze mode: $e");
+      state = oldState; // Rollback
+      rethrow;
     }
   }
 
   Future<void> updateWorkLimit(int limit) async {
     final current = state.value;
     if (current == null) return;
+
+    final oldState = state;
+    state = AsyncValue.data(current.copyWith(workCapacityLimit: limit));
+
     try {
       final updated = await _repository.updateProfile({'work_capacity_limit': limit});
       state = AsyncValue.data(updated);
     } catch (e) {
-      print("Erreur update work limit: $e");
+      state = oldState; // Rollback
+      rethrow;
     }
   }
 }

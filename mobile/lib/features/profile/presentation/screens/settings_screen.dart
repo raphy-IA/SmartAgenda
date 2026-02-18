@@ -35,7 +35,11 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: const Text("Désactive les tâches non-urgentes pour souffler.", style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               value: profile.freezeMode,
               activeColor: AppColors.primary,
-              onChanged: (_) => ref.read(profileProvider.notifier).toggleFreezeMode(),
+              onChanged: (_) => _handleAction(
+                context, 
+                () => ref.read(profileProvider.notifier).toggleFreezeMode(),
+                "Mode FREEZE ${profile.freezeMode ? 'désactivé' : 'activé'}"
+              ),
             ),
             
             const SizedBox(height: 10),
@@ -91,20 +95,41 @@ class SettingsScreen extends ConsumerWidget {
   Widget _buildChronotypeSelector(BuildContext context, WidgetRef ref, String current) {
     return Column(
       children: [
-        _buildChronoItem(ref, "matin", "Alouette (Matin)", "Pic d'énergie : 08h - 12h", Icons.wb_sunny_outlined, current == "matin"),
-        _buildChronoItem(ref, "neutre", "Équilibré", "Pic d'énergie : Journée standard", Icons.access_time, current == "neutre"),
-        _buildChronoItem(ref, "soir", "Hibou (Soir)", "Pic d'énergie : 17h - 21h", Icons.nightlight_round, current == "soir"),
+        _buildChronoItem(context, ref, "matin", "Alouette (Matin)", "Pic d'énergie : 08h - 12h", Icons.wb_sunny_outlined, current == "matin"),
+        _buildChronoItem(context, ref, "neutre", "Équilibré", "Pic d'énergie : Journée standard", Icons.access_time, current == "neutre"),
+        _buildChronoItem(context, ref, "soir", "Hibou (Soir)", "Pic d'énergie : 17h - 21h", Icons.nightlight_round, current == "soir"),
       ],
     );
   }
 
-  Widget _buildChronoItem(WidgetRef ref, String value, String title, String sub, IconData icon, bool isSelected) {
+  Future<void> _handleAction(BuildContext context, Future<void> Function() action, String successMsg) async {
+    try {
+      await action();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(successMsg), backgroundColor: AppColors.success, duration: const Duration(seconds: 1)),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Échec : $e"), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Widget _buildChronoItem(BuildContext context, WidgetRef ref, String value, String title, String sub, IconData icon, bool isSelected) {
     return ListTile(
       leading: Icon(icon, color: isSelected ? AppColors.primary : AppColors.textSecondary),
       title: Text(title, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textPrimary, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
       subtitle: Text(sub, style: const TextStyle(fontSize: 11)),
       trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-      onTap: () => ref.read(profileProvider.notifier).updateChronotype(value),
+      onTap: () => _handleAction(
+        context, 
+        () => ref.read(profileProvider.notifier).updateChronotype(value),
+        "Constitution mise à jour ($title)"
+      ),
     );
   }
 
@@ -114,7 +139,7 @@ class SettingsScreen extends ConsumerWidget {
       builder: (context) {
         int val = current;
         return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
+          builder: (dialogCtx, setDialogState) => AlertDialog(
             backgroundColor: AppColors.surface,
             title: const Text("Capacité de travail", style: TextStyle(color: AppColors.textPrimary)),
             content: Column(
@@ -133,11 +158,15 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("ANNULER")),
+              TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text("ANNULER")),
               ElevatedButton(
                 onPressed: () {
-                  ref.read(profileProvider.notifier).updateWorkLimit(val);
-                  Navigator.pop(context);
+                  Navigator.pop(dialogCtx);
+                  _handleAction(
+                    context,
+                    () => ref.read(profileProvider.notifier).updateWorkLimit(val),
+                    "Limite mise à jour : $val heures"
+                  );
                 },
                 child: const Text("ENREGISTRER"),
               ),
