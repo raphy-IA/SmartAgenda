@@ -16,7 +16,10 @@ async def read_profile(request: Request):
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
         return profile
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"ERROR READ PROFILE: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/", response_model=UserProfile)
@@ -27,5 +30,8 @@ async def update_profile(request: Request, profile_in: UserProfileUpdate):
     try:
         user_id = get_current_user_id(request.headers.get("Authorization"))
         return ProfileService.update_profile(user_id, profile_in)
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"ERROR UPDATE PROFILE: {e}")
         raise HTTPException(status_code=500, detail=str(e))

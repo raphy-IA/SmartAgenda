@@ -15,7 +15,7 @@ class UserProfileUpdate(BaseModel):
 
 class UserProfile(UserProfileBase):
     user_id: UUID
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

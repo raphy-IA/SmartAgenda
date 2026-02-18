@@ -18,17 +18,23 @@ class ProfileService:
 
     @staticmethod
     def create_default_profile(user_id: str) -> dict:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
         default_profile = {
             "user_id": user_id,
             "chronotype": "neutre",
             "freeze_mode": False,
-            "work_capacity_limit": 10
+            "work_capacity_limit": 10,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
         }
         try:
             response = db.table("user_profiles").insert(default_profile).execute()
-            return response.data[0] if response.data else default_profile
+            if response.data:
+                return response.data[0]
+            return default_profile
         except Exception as e:
-            print(f"❌ Profile Creation Error: {e}")
+            print(f"❌ Profile Creation Error (Table likely missing): {e}")
             return default_profile
 
     @staticmethod
