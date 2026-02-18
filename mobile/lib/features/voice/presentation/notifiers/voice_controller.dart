@@ -20,6 +20,7 @@ class VoiceState {
   final VoiceLanguageMode mode; // Mode sélectionné (AUTO, FR, EN)
   final ConflictException? conflict; 
   final Event? pendingEvent; 
+  final String? systemLocaleId; // Stocker la locale système détectée
 
   VoiceState({
     this.isListening = false,
@@ -30,6 +31,7 @@ class VoiceState {
     this.mode = VoiceLanguageMode.auto,
     this.conflict,
     this.pendingEvent,
+    this.systemLocaleId,
   });
 
   VoiceState copyWith({
@@ -43,6 +45,7 @@ class VoiceState {
     ConflictException? conflict,
     Event? pendingEvent,
     bool clearConflict = false,
+    String? systemLocaleId,
   }) {
     return VoiceState(
       isListening: isListening ?? this.isListening,
@@ -53,6 +56,7 @@ class VoiceState {
       mode: mode ?? this.mode,
       conflict: clearConflict ? null : (conflict ?? this.conflict),
       pendingEvent: clearConflict ? null : (pendingEvent ?? this.pendingEvent),
+      systemLocaleId: systemLocaleId ?? this.systemLocaleId,
     );
   }
 }
@@ -97,7 +101,12 @@ class VoiceController extends StateNotifier<VoiceState> {
       }
       
       // Pour AUTO, on laisse localeId à null pour laisser le système gérer
-      state = state.copyWith(mode: VoiceLanguageMode.auto, clearLocale: true);
+      final system = await _speechToText.systemLocale();
+      state = state.copyWith(
+        mode: VoiceLanguageMode.auto, 
+        clearLocale: true,
+        systemLocaleId: system?.localeId,
+      );
     } else {
       state = state.copyWith(error: "Reconnaissance vocale non disponible");
     }
@@ -112,26 +121,37 @@ class VoiceController extends StateNotifier<VoiceState> {
     };
 
     if (nextMode == VoiceLanguageMode.auto) {
-      // Mode AUTO : Pas de localeId forcée
-      state = state.copyWith(mode: nextMode, clearLocale: true);
+      // Mode AUTO : Pas de localeId forcée, et on efface l'erreur
+      state = state.copyWith(mode: nextMode, clearLocale: true, error: null);
     } else {
       final locales = await _speechToText.locales();
       final targetPrefix = nextMode == VoiceLanguageMode.fr ? "fr" : "en";
       
-      // Essayer de trouver une locale précise (fr_FR ou en_US) d'abord
-      final perfectMatch = locales.firstWhere(
-        (l) => l.localeId.toLowerCase().replaceFirst("_", "-") == (nextMode == VoiceLanguageMode.fr ? "fr-fr" : "en-us"),
-        orElse: () => locales.firstWhere(
-          (l) => l.localeId.toLowerCase().startsWith(targetPrefix),
-          orElse: () => locales.firstWhere(
-            (l) => l.localeId.contains(targetPrefix), 
-            orElse: () => nextMode == VoiceLanguageMode.fr 
+      // PRIORITÉ 1: Si la locale système correspond à la langue demandée, on utilise NULL
+      // pour laisser le moteur utiliser son réglage par défaut (on SAIT que ça marche en AUTO)
+      if (state.systemLocaleId != null && state.systemLocaleId!.toLowerCase().startsWith(targetPrefix)) {
+        state = state.copyWith(mode: nextMode, clearLocale: true, error: null);
+        return;
+      }
+
+      try {
+        bestMatch = locales.firstWhere(
+          (l) => l.localeId.toLowerCase().replaceAll("_", "-") == (nextMode == VoiceLanguageMode.fr ? "fr-fr" : "en-us")
+        );
+      } catch (_) {
+        try {
+          bestMatch = locales.firstWhere((l) => l.localeId.toLowerCase().startsWith(targetPrefix));
+        } catch (_) {
+          try {
+            bestMatch = locales.firstWhere((l) => l.localeId.contains(targetPrefix));
+          } catch (_) {
+            bestMatch = nextMode == VoiceLanguageMode.fr 
               ? LocaleName("fr-FR", "Français") 
-              : LocaleName("en-US", "English")
-          ),
-        ),
-      );
-      state = state.copyWith(mode: nextMode, localeId: perfectMatch.localeId);
+              : LocaleName("en-US", "English");
+          }
+        }
+      }
+      state = state.copyWith(mode: nextMode, localeId: bestMatch.localeId, error: null);
     }
   }
 
@@ -178,7 +198,7 @@ class VoiceController extends StateNotifier<VoiceState> {
   // CANCEL (Reset)
   Future<void> cancelRecording() async {
     await _speechToText.cancel();
-    state = state.copyWith(isListening: false, text: '', clearConflict: true);
+    state = state.copyWith(isListening: false, text: '', error: null, clearConflict: true);
   }
 
   void clearConflict() {
