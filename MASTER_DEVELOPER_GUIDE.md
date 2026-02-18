@@ -1,0 +1,75 @@
+# 📔 SmartAgenda AI - Master Developer Guide
+
+Ce guide centralise toute la configuration et les procédures pour le projet SmartAgenda AI.
+
+## 🏗 Architecture du Projet
+
+Le système est composé de trois briques principales :
+1.  **Mobile (Flutter)** : Interface utilisateur (Android/Web).
+2.  **IA Backend (Python FastAPI)** : Le "cerveau" qui traite la voix et gère la logique métier.
+3.  **Base de Données (Supabase)** : Stockage persistant des événements et authentification.
+
+---
+
+## 💻 Environnement Local (Développement)
+
+### 1. Backend IA
+Le backend doit tourner pour que le micro et l'IA fonctionnent.
+- **Dossier** : `backend/`
+- **Commandes** :
+  ```bash
+  cd backend
+  # Activer l'environnement virtuel (Windows)
+  .\venv\Scripts\activate
+  # Lancer le serveur
+  uvicorn app.main:app --reload --port 8001
+  ```
+- **Lien local** : `http://localhost:8001`
+
+### 2. Application Mobile
+- **Dossier** : `mobile/`
+- **Lancer sur Chrome** : `flutter run -d chrome`
+- **Lancer sur Android** : `flutter run -d android`
+- **Configuration API** : Se gère dans `lib/core/config/api_config.dart`.
+
+---
+
+## 🌐 Environnement Distant (Production)
+
+### 1. Supabase (Base de Données)
+- **Colonnes obligatoires** (Table `events`) : `status` (TEXT), `metadata` (JSONB).
+- **Migration** : Exécuter `supabase_migration.sql` dans le SQL Editor de Supabase si ces champs manquent.
+
+### 2. VPS Backend (Docker)
+Le backend est hébergé sur un VPS Linux et tourne via Docker pour une stabilité maximale.
+- **IP VPS** : `2a02:4780:2d:a183::1` (Port 8001)
+- **Mise à jour du serveur** :
+  ```bash
+  ssh raphyai82@votre-ip
+  cd /home/raphyai82/apps/SmartAgenda/SmartAgenda
+  git pull origin main
+  docker compose up -d --build backend
+  ```
+
+---
+
+## 🔧 Opérations Courantes
+
+### Mettre à jour l'IA et l'Application
+1.  Faites vos modifications de code localement.
+2.  Poussez sur GitHub : `git add . ; git commit -m "Description" ; git push`.
+3.  **Sur le VPS** : Lancez le `docker compose` cité plus haut.
+4.  **Sur GitHub** : Récupérez l'APK généré automatiquement dans l'onglet **Actions**.
+
+### Débogage
+- **Logs local** : Regardez le terminal où tourne `uvicorn`.
+- **Logs VPS** : `docker logs -f smartagenda_backend`.
+- **Vérifier les ports** : `sudo netstat -tulpn | grep LISTEN`.
+
+---
+
+## 📝 Configuration des Clés (.env)
+Le fichier `backend/.env` doit contenir :
+- `GROQ_API_KEY` : Pour le parsing vocal rapide.
+- `GOOGLE_API_KEY` : (Optionnel) Pour Gemini.
+- `SUPABASE_URL` & `SUPABASE_KEY` : Clés de l'instance Supabase.
