@@ -33,14 +33,15 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
       final events = await _repository.getEvents();
       state = AsyncValue.data(events);
       
-      // Programmer les rappels pour TOUS les événements à venir
-      for (final event in events) {
-        if (event.status != 'cancelled') {
-          _notifications.scheduleProactiveReminders(event);
-        } else {
-          // S'assurer d'annuler si le statut a changé vers 'cancelled'
-          _notifications.cancelEventNotifications(event.id.hashCode);
-        }
+      // Programmer les rappels pour les événements à venir (PROCHAINES 48H pour éviter les limites OS)
+      final upcomingEvents = events.where((e) => 
+        e.status != 'cancelled' && 
+        e.startTime.isAfter(DateTime.now()) && 
+        e.startTime.isBefore(DateTime.now().add(const Duration(days: 2)))
+      ).toList();
+
+      for (final event in upcomingEvents) {
+        _notifications.scheduleProactiveReminders(event);
       }
 
       // Programmer les briefings (Soir et Matin)

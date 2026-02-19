@@ -45,19 +45,36 @@ class NotificationService {
       },
     );
 
-    // Create High-Priority Channels for Android
+    // Create Channels for Android
     final androidPlugin = _notificationsPlugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
-      const AndroidNotificationChannel urgentChannel = AndroidNotificationChannel(
-        'channel_urgent',
-        'Alertes Urgentes',
-        description: 'Utilisé pour les rappels de dernière minute (Plein Écran)',
-        importance: Importance.max,
-        playSound: true,
-        enableVibration: true,
-      );
-      await androidPlugin.createNotificationChannel(urgentChannel);
+      const List<AndroidNotificationChannel> channels = [
+        AndroidNotificationChannel(
+          'channel_urgent',
+          'Alertes Urgentes',
+          description: 'Rappels de dernière minute (Plein Écran)',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        ),
+        AndroidNotificationChannel(
+          'channel_scheduled',
+          'Rappels Planifiés',
+          description: 'Rappels automatiques de vos événements',
+          importance: Importance.high,
+        ),
+        AndroidNotificationChannel(
+          'channel_instant',
+          'Notifications Directes',
+          description: 'Confirmations et messages instantanés',
+          importance: Importance.defaultImportance,
+        ),
+      ];
+
+      for (final channel in channels) {
+        await androidPlugin.createNotificationChannel(channel);
+      }
     }
   }
 
@@ -77,14 +94,11 @@ class NotificationService {
   }
 
   Future<void> scheduleProactiveReminders(dynamic event) async {
-    // Note: event dynamic to avoid circular dependency or casting issues 
-    // We assume it has title, startTime, and id properties.
     final String title = event.title;
     final DateTime startTime = event.startTime;
-    // ID stable sur 32-bit pour éviter les débordements sur Android
     final int baseId = (event.id.hashCode.abs() % 1000000);
 
-    // 1. Rappel 1h avant (ID: hash + 1)
+    // 1. Rappel 1h avant
     await scheduleNotification(
       baseId + 1,
       "Rappel : $title",
@@ -92,7 +106,7 @@ class NotificationService {
       startTime.subtract(const Duration(hours: 1)),
     );
 
-    // 2. Rappel 10 min avant (ID: hash + 2)
+    // 2. Rappel 10 min avant
     await scheduleNotification(
       baseId + 2,
       "Préparez-vous : $title",
@@ -101,7 +115,7 @@ class NotificationService {
       isHighPriority: true,
     );
 
-    // 3. Alerte Plein Écran 3 min avant (ID: hash + 3)
+    // 3. Alerte Plein Écran 3 min avant
     await scheduleNotification(
       baseId + 3,
       "URGENT : $title",
@@ -117,12 +131,16 @@ class NotificationService {
     
     if (scheduledDate.isBefore(DateTime.now())) return;
 
+    if (kDebugMode) {
+      print("🔔 Scheduling notification $id at $scheduledDate: $title");
+    }
+
     final androidDetails = AndroidNotificationDetails(
       isUrgent ? 'channel_urgent' : (isHighPriority ? 'channel_scheduled' : 'channel_instant'),
-      isUrgent ? 'Alertes Urgentes' : 'Rappels Client',
+      isUrgent ? 'Alertes Urgentes' : (isHighPriority ? 'Rappels Planifiés' : 'Notifications Directes'),
       importance: isUrgent ? Importance.max : (isHighPriority ? Importance.high : Importance.defaultImportance),
       priority: isUrgent ? Priority.max : (isHighPriority ? Priority.high : Priority.defaultPriority),
-      fullScreenIntent: isUrgent, // ACTIVE LE MODE PLEIN ÉCRAN
+      fullScreenIntent: isUrgent,
       category: AndroidNotificationCategory.alarm,
     );
 
@@ -153,34 +171,27 @@ class NotificationService {
   Future<void> scheduleDailyDigests(List<Event> allEvents) async {
     final now = DateTime.now();
 
-    // --- 1. SOIR (20h) pour DEMAIN ---
-    final tomorrow = now.add(const Duration(days: 1));
-    final tomorrowEvents = _filterEventsForDay(allEvents, tomorrow);
+    // --- 1. BRIEFING DU SOIR (20h) ---
+    // Si il est déjà passé 20h aujourd'hui, on prévoit pour demain 20h
+    DateTime eveTarget = DateTime(now.year, now.month, now.day, 20, 0);
+    if (now.isAfter(eveTarget)) {
+      eveTarget = eveTarget.add(const Duration(days: 1));
+    }
     
-    if (tomorrowEvents.isNotEmpty) {
-      final scheduledEve = DateTime(now.year, now.month, now.day, 20, 0);
-      if (scheduledEve.isAfter(now)) {
-        await _scheduleDigestNotification(
-          999999, 
-          "Briefing de demain 📋", 
-          _buildDigestMessage(tomorrowEvents, "Demain"),
-          scheduledEve
-        );
-      }
+    final eveEvents = _filterEventsForDay(allEvents, eveTarget.add(const Duration(hours: 4))); // Events de "demain"
+    if (eveEvents.isNotEmpty) {
+      await _scheduleDigestNotification(999999, "Briefing du soir 📋", _buildDigestMessage(eveEvents, "Demain"), eveTarget);
     }
 
-    // --- 2. MATIN (06h) pour AUJOURD'HUI ---
-    final todayEvents = _filterEventsForDay(allEvents, now);
-    if (todayEvents.isNotEmpty) {
-      final scheduledMorn = DateTime(now.year, now.month, now.day, 6, 0);
-      if (scheduledMorn.isAfter(now)) {
-        await _scheduleDigestNotification(
-          888888, 
-          "Votre journée ☕", 
-          _buildDigestMessage(todayEvents, "Aujourd'hui"),
-          scheduledMorn
-        );
-      }
+    // --- 2. BRIEFING DU MATIN (06h) ---
+    DateTime mornTarget = DateTime(now.year, now.month, now.day, 6, 0);
+    if (now.isAfter(mornTarget)) {
+      mornTarget = mornTarget.add(const Duration(days: 1));
+    }
+    
+    final mornEvents = _filterEventsForDay(allEvents, mornTarget); // Events du jour du rappel
+    if (mornEvents.isNotEmpty) {
+      await _scheduleDigestNotification(888888, "Votre journée ☕", _buildDigestMessage(mornEvents, "Aujourd'hui"), mornTarget);
     }
   }
 
