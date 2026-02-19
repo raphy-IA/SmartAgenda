@@ -21,6 +21,9 @@ class ZenEventCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Check for conflict
+    final hasConflict = ref.watch(eventConflictProvider(event.id));
+    
     // Check for past event
     final isPast = event.endTime.isBefore(DateTime.now());
 
@@ -47,7 +50,7 @@ class ZenEventCard extends ConsumerWidget {
       : EventThemeHelper.getPriorityColor(priority);
 
     return Opacity(
-      opacity: isPast ? 0.6 : 1.0,
+      opacity: isPast ? 0.7 : 1.0,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -261,9 +264,7 @@ class ZenEventCard extends ConsumerWidget {
             ),
           ),
         ),
-      ).animate(target: isPast ? 0 : 1).fadeIn().slideX(begin: 0.1, end: 0, curve: Curves.easeOut),
+      ).animate().fadeIn().slideX(begin: 0.1, end: 0, curve: Curves.easeOut),
     );
-  }
-}
   }
 }

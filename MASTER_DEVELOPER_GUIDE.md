@@ -31,11 +31,12 @@ Le système est composé de trois briques principales :
 Le backend doit tourner pour que le micro et l'IA fonctionnent.
 - **Dossier** : `backend/`
 - **Commandes** :
-  ```bash
+  ```powershell
+  # 1. Activer l'environnement (depuis la racine du projet)
+  .\venv\Scripts\Activate.ps1
+  
+  # 2. Lancer le serveur
   cd backend
-  # Activer l'environnement virtuel (Windows)
-  .\venv\Scripts\activate
-  # Lancer le serveur
   uvicorn app.main:app --reload --port 8001
   ```
 - **Lien local** : `http://localhost:8001`

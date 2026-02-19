@@ -3,7 +3,7 @@
 ## 🖥 Développement Local (PC)
 - **Backend IA** :
   ```powershell
-  cd backend ; ..\venv\Scripts\Activate.ps1 ; uvicorn app.main:app --reload --port 8001
+  .\venv\Scripts\Activate.ps1 ; cd backend ; uvicorn app.main:app --reload --port 8001
   ```
 - **Lancer l'App** :
   ```powershell
