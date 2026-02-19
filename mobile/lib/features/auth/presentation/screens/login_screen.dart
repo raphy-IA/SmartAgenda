@@ -111,7 +111,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               if (!kReleaseMode)
                 TextButton(
                   onPressed: () {
-                    ApiConfig.isDemoMode = true;
                     ref.read(demoModeProvider.notifier).state = true;
                   },
                   child: const Text(

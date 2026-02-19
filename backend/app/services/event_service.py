@@ -134,15 +134,35 @@ class EventService:
 
         try:
             response = db.table("events").update(event_data).eq("id", event_id).eq("user_id", user_id).execute()
+            if not response.data or len(response.data) == 0:
+                 # Si rien n'est modifié (ex: pas le bon proprio), on renvoie une erreur explicite ou l'état actuel
+                 print(f"⚠️ [EventService] Update failed: No row matched for id={event_id} and user={user_id}")
+                 raise ValueError("Accès refusé ou événement introuvable")
             return response.data[0]
         except Exception as e:
-            print(f"❌ DB ERROR: {e}. Falling back to MOCK.")
-            # Tentative de mise à jour dans le mock si la DB échoue
+            print(f"❌ DB ERROR Update: {e}. Falling back to MOCK.")
             for i, ev in enumerate(MOCK_DB_STORE):
                 if ev["id"] == event_id and ev["user_id"] == user_id:
                     MOCK_DB_STORE[i].update(event_data)
                     return MOCK_DB_STORE[i]
             raise e
+
+    @staticmethod
+    def delete_event(user_id: str, event_id: str) -> bool:
+        global MOCK_DB_STORE
+        if EventService._is_mock_mode():
+            print(f"[EventService] MOCK MODE: Deleting event {event_id}")
+            initial_count = len(MOCK_DB_STORE)
+            MOCK_DB_STORE = [e for e in MOCK_DB_STORE if not (e["id"] == event_id and e["user_id"] == user_id)]
+            return len(MOCK_DB_STORE) < initial_count
+
+        try:
+            response = db.table("events").delete().eq("id", event_id).eq("user_id", user_id).execute()
+            return True # Successfully tried to delete
+        except Exception as e:
+            print(f"❌ DB ERROR Delete: {e}. Falling back to MOCK.")
+            MOCK_DB_STORE = [e for e in MOCK_DB_STORE if not (e["id"] == event_id and e["user_id"] == user_id)]
+            return True
 
     @staticmethod
     def get_daily_load(user_id: str, date_str: str) -> float:
