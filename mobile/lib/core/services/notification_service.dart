@@ -1,4 +1,4 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/foundation.dart';
@@ -18,6 +18,8 @@ class NotificationService {
 
   Future<void> init() async {
     tz.initializeTimeZones();
+    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
 
     // Android Settings
     const AndroidInitializationSettings androidSettings =
@@ -84,6 +86,12 @@ class NotificationService {
     if (android != null) {
       await android.requestNotificationsPermission();
       await android.requestExactAlarmsPermission();
+      
+      // Additional check for full screen intent if needed by platform
+      final bool? allowed = await android.canScheduleExactAlarms();
+      if (kDebugMode) {
+        print("🔔 Exact Alarms Allowed: $allowed");
+      }
     }
     
     final ios = _notificationsPlugin.resolvePlatformSpecificImplementation<
