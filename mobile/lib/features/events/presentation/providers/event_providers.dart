@@ -69,7 +69,7 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
       await _repository.updateEvent(event, force: force);
       
       // Annuler et reprogrammer
-      _notifications.cancelEventNotifications(event.id.hashCode);
+      _notifications.cancelEventNotifications(event.id);
       _notifications.scheduleProactiveReminders(event);
       
       await fetchEvents();
@@ -81,7 +81,7 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
   Future<void> deleteEvent(String id) async {
     try {
       await _repository.deleteEvent(id);
-      _notifications.cancelEventNotifications(id.hashCode);
+      _notifications.cancelEventNotifications(id);
       await fetchEvents();
     } catch (e) {
       rethrow;
